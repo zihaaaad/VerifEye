@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "VerifEye: AI Image Detector",
+  "version": "1.3.0",
+  "description": "Click the VerifEye icon to enable. Hover over any image to detect the probability of it being AI-generated.",
+  "permissions": [
+    "storage",
+    "scripting",
+    "tabs",
+    "action"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "action": {},
+  "options_page": "settings/settings.html",
+  "icons": {
+    "16": "assets/icon16.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  }
+}
