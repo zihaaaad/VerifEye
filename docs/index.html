@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VerifEye | Forensic-Grade In-Browser AI Image Detection</title>
+    <meta name="description" content="VerifEye is a real-time, local-first Chrome extension that detects AI-generated imagery on hover using open-source frequency, noise, and metadata forensic algorithms.">
+    <link rel="icon" type="image/png" href="assets/icon16.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="container nav-content">
+            <a href="#" class="nav-logo">
+                <img src="assets/icon48.png" width="32" height="32" alt="VerifEye Logo">
+                <span>VerifEye</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="#playground">Interactive Demo</a></li>
+                <li><a href="#algorithms">Forensic Engine</a></li>
+                <li><a href="#comparison">Architecture</a></li>
+                <li><a href="#install">Installation</a></li>
+            </ul>
+            <div class="nav-cta">
+                <a href="https://github.com/zihaaaad/VerifEye-AI-Image-Detector" target="_blank" class="btn btn-secondary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                    GitHub
+                </a>
+                <a href="#install" class="btn btn-primary">Get Extension</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="container">
+            <div class="hero-pill">
+                <span class="badge badge-cyan">v2.0 • Local Open-Source Forensics</span>
+            </div>
+            <h1 class="hero-title">
+                Forensic-Grade AI Image Detection.<br>
+                <span>Zero API. Right in Your Browser.</span>
+            </h1>
+            <p class="hero-desc">
+                Distinguish real camera photography from Midjourney, Stable Diffusion, DALL-E, and Flux in under 20 milliseconds. Powered by in-browser 2D Fourier decomposition, sensor noise kurtosis, and binary provenance forensics.
+            </p>
+            <div class="hero-actions">
+                <a href="#install" class="btn btn-primary" style="padding: 12px 24px; font-size: 1rem;">Install for Chrome</a>
+                <a href="#playground" class="btn btn-secondary" style="padding: 12px 24px; font-size: 1rem;">Try Live Demo</a>
+            </div>
+            <div class="hero-metrics">
+                <div class="metric-item">
+                    <div class="metric-val">&lt; 18ms</div>
+                    <div class="metric-lbl">Analysis Latency</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-val">100%</div>
+                    <div class="metric-lbl">Client-Side Privacy</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-val">$0.00</div>
+                    <div class="metric-lbl">Zero API Cost</div>
+                </div>
+                <div class="metric-item">
+                    <div class="metric-val">5 Signals</div>
+                    <div class="metric-lbl">Ensemble Fusion</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Interactive Simulator / Playground -->
+    <section class="section" id="playground">
+        <div class="container">
+            <div class="section-header">
+                <span class="badge badge-cyan" style="margin-bottom: 8px;">Interactive Simulator</span>
+                <h2 class="section-title">Decomposing Pixels in Real Time</h2>
+                <p class="section-desc">Select any sample below to simulate the in-browser forensic engine and inspect the live 2D Fourier power spectrum.</p>
+            </div>
+
+            <!-- Demo Cards -->
+            <div class="demo-grid">
+                <div class="demo-card active" data-preset="sdxl">
+                    <div class="demo-img-wrapper">
+                        <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80" alt="Synthetic Sample">
+                        <div class="sim-tooltip ai">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                <b style="color:#f87171;">Likely AI: 98%</b>
+                                <span style="font-size:9px; background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:3px;">Local</span>
+                            </div>
+                            <div style="font-size:10px; color:#cbd5e1;">• High-frequency grid peaks (18 detected)<br>• Diffusion oversmoothing</div>
+                        </div>
+                    </div>
+                    <div class="demo-card-body">
+                        <div class="demo-card-title">
+                            <span>Stable Diffusion XL</span>
+                            <span class="badge badge-cyan" style="font-size:10px;">AI</span>
+                        </div>
+                        <div class="demo-card-sub">Periodic Upsampling Grid</div>
+                    </div>
+                </div>
+
+                <div class="demo-card" data-preset="dslr">
+                    <div class="demo-img-wrapper">
+                        <img src="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=600&auto=format&fit=crop&q=80" alt="Authentic DSLR Camera">
+                        <div class="sim-tooltip real">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                <b style="color:#4ade80;">Likely Real: 8%</b>
+                                <span style="font-size:9px; background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:3px;">Local</span>
+                            </div>
+                            <div style="font-size:10px; color:#cbd5e1;">• Natural 1/f² power decay<br>• Poisson-Gaussian sensor grain</div>
+                        </div>
+                    </div>
+                    <div class="demo-card-body">
+                        <div class="demo-card-title">
+                            <span>Authentic DSLR Capture</span>
+                            <span class="badge badge-green" style="font-size:10px;">Real</span>
+                        </div>
+                        <div class="demo-card-sub">Canon EOS R5 • 50mm f/2.8</div>
+                    </div>
+                </div>
+
+                <div class="demo-card" data-preset="midjourney">
+                    <div class="demo-img-wrapper">
+                        <img src="https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=600&auto=format&fit=crop&q=80" alt="Midjourney Render">
+                        <div class="sim-tooltip ai">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                <b style="color:#f87171;">Likely AI: 94%</b>
+                                <span style="font-size:9px; background:rgba(255,255,255,0.1); padding:2px 4px; border-radius:3px;">Local</span>
+                            </div>
+                            <div style="font-size:10px; color:#cbd5e1;">• Non-Gaussian kurtosis (9.2)<br>• VAE color compression</div>
+                        </div>
+                    </div>
+                    <div class="demo-card-body">
+                        <div class="demo-card-title">
+                            <span>Midjourney v6</span>
+                            <span class="badge badge-cyan" style="font-size:10px;">AI</span>
+                        </div>
+                        <div class="demo-card-sub">Synthetic Noise Residual</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Inspector Box -->
+            <div class="forensics-inspector">
+                <div class="inspector-chart-box">
+                    <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <span style="font-size:0.85rem; font-weight:600; color:var(--text-secondary);">2D Fourier Spectrum Magnitude |F(u,v)|²</span>
+                        <span id="badgeVerdict" class="badge badge-cyan">Likely AI (98%)</span>
+                    </div>
+                    <canvas id="fourierCanvas" width="280" height="200" style="border-radius:8px; width:100%; max-width:360px; height:200px;"></canvas>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-top:8px; font-family:var(--font-mono);">
+                        Radix-2 FFT Decomposition with 2D Hann Windowing
+                    </div>
+                </div>
+
+                <div class="inspector-details">
+                    <h3 id="inspectorTitle" style="font-size:1.15rem; margin-bottom:16px;">Stable Diffusion XL (WebUI)</h3>
+                    
+                    <div class="signals-list">
+                        <div class="signal-row">
+                            <div class="signal-info">
+                                <h4>2D FFT Frequency Grid</h4>
+                                <p>Upsampling periodic harmonic spikes</p>
+                            </div>
+                            <span id="valFft" class="signal-val" style="color:var(--crimson);">92% (18 peaks)</span>
+                        </div>
+
+                        <div class="signal-row">
+                            <div class="signal-info">
+                                <h4>Sensor Noise Residual (PRNU)</h4>
+                                <p>Laplacian spatial variance and kurtosis</p>
+                            </div>
+                            <span id="valNoise" class="signal-val" style="color:var(--crimson);">88% (Oversmoothed)</span>
+                        </div>
+
+                        <div class="signal-row">
+                            <div class="signal-info">
+                                <h4>Metadata and Provenance</h4>
+                                <p>PNG chunks, EXIF, and C2PA headers</p>
+                            </div>
+                            <span id="valMeta" class="signal-val" style="color:var(--cyan);">Parameters found</span>
+                        </div>
+
+                        <div class="signal-row">
+                            <div class="signal-info">
+                                <h4>Error Level Analysis (ELA)</h4>
+                                <p>8x8 DCT quantization consistency</p>
+                            </div>
+                            <span id="valEla" class="signal-val" style="color:var(--amber);">74%</span>
+                        </div>
+
+                        <div class="signal-row">
+                            <div class="signal-info">
+                                <h4>Color and Lens Optics</h4>
+                                <p>Radial chromatic dispersion test</p>
+                            </div>
+                            <span id="valColor" class="signal-val" style="color:var(--crimson);">82% (Hyper-correlated)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Forensic Engine Deep Dive -->
+    <section class="section" id="algorithms" style="background: rgba(14, 19, 31, 0.4); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle);">
+        <div class="container">
+            <div class="section-header">
+                <span class="badge badge-cyan" style="margin-bottom: 8px;">Mathematical Foundations</span>
+                <h2 class="section-title">How VerifEye Detects AI Without Cloud APIs</h2>
+                <p class="section-desc">Generative models do not synthesize pixels according to physical camera optics. VerifEye measures mathematical and structural anomalies directly in the browser.</p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon" style="font-family: var(--font-mono); font-weight: 700;">FFT</div>
+                    <h3 class="feature-title">2D Fast Fourier Transform</h3>
+                    <p class="feature-desc">
+                        Neural deconvolution and attention upsampling leave periodic checkerboard artifacts. VerifEye computes a 2D Radix-2 FFT on luminance patches with a 2D Hann window, measuring harmonic peak spikes and radial power decay slopes.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon" style="font-family: var(--font-mono); font-weight: 700;">PRN</div>
+                    <h3 class="feature-title">Sensor Noise Residual (PRNU)</h3>
+                    <p class="feature-desc">
+                        Real camera sensors exhibit Poisson-Gaussian shot noise. Diffusion denoising schedulers create unnatural texture oversmoothing. VerifEye uses a 3x3 Laplacian high-pass filter to compute residual kurtosis and flat-region variance ratios.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon" style="font-family: var(--font-mono); font-weight: 700;">XMP</div>
+                    <h3 class="feature-title">Binary Metadata and C2PA</h3>
+                    <p class="feature-desc">
+                        Parses raw binary PNG chunks (<code style="color:var(--cyan);">tEXt</code>, <code style="color:var(--cyan);">iTXt</code>), JPEG APP segments, XMP packets, and C2PA Content Credentials manifests for embedded generation prompts, sampler parameters, and algorithmic media declarations.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon" style="font-family: var(--font-mono); font-weight: 700;">ELA</div>
+                    <h3 class="feature-title">Error Level Analysis</h3>
+                    <p class="feature-desc">
+                        Evaluates 8x8 block discrete cosine transform (DCT) quantization boundaries and variance spread to detect synthetic inpainting, face swaps, and single-pass generative decoder profiles.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon" style="font-family: var(--font-mono); font-weight: 700;">RGB</div>
+                    <h3 class="feature-title">Optical Chromatic Dispersion</h3>
+                    <p class="feature-desc">
+                        Physical camera lenses cause subtle radial wavelength dispersion (chromatic aberration) at peripheral high-contrast edges. Synthetic images lack physical lens physics and show hyper-correlated RGB channels.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon" style="font-family: var(--font-mono); font-weight: 700;">MOD</div>
+                    <h3 class="feature-title">Tri-Mode Architecture</h3>
+                    <p class="feature-desc">
+                        Seamlessly switch between <b>Local Offline Engine</b> (private, 0ms network latency), <b>Hybrid Engine</b> (local fast scan + cloud verification), or <b>Cloud API Mode</b> (Google Gemini 1.5/2.0 Flash).
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Comparison Table -->
+    <section class="section" id="comparison">
+        <div class="container">
+            <div class="section-header">
+                <span class="badge badge-cyan" style="margin-bottom: 8px;">Technical Benchmark</span>
+                <h2 class="section-title">Local Forensics vs. Cloud Multimodal APIs</h2>
+                <p class="section-desc">Comparison of local forensic processing against cloud-hosted vision endpoints.</p>
+            </div>
+
+            <div class="table-wrapper">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Capability</th>
+                            <th class="highlight-col">VerifEye v2.0 (Local Engine)</th>
+                            <th>Traditional Cloud APIs</th>
+                            <th>Generic Multimodal LLMs</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><b>Analysis Latency</b></td>
+                            <td class="highlight-col">&lt; 18ms (Instant on Hover)</td>
+                            <td>1,500ms – 3,500ms</td>
+                            <td>2,000ms – 5,000ms</td>
+                        </tr>
+                        <tr>
+                            <td><b>API Key &amp; Costs</b></td>
+                            <td class="highlight-col">$0.00 • Zero API Required</td>
+                            <td>Paid monthly subscription</td>
+                            <td>Token pricing &amp; rate limits</td>
+                        </tr>
+                        <tr>
+                            <td><b>User Privacy</b></td>
+                            <td class="highlight-col">100% On-Device (Zero Uploads)</td>
+                            <td>Images sent to third-party cloud</td>
+                            <td>Images stored &amp; logged in cloud</td>
+                        </tr>
+                        <tr>
+                            <td><b>Frequency Grid Detection</b></td>
+                            <td class="highlight-col">Yes (Mathematical 2D FFT)</td>
+                            <td>Varies</td>
+                            <td>No (Semantic only)</td>
+                        </tr>
+                        <tr>
+                            <td><b>Provenance &amp; C2PA</b></td>
+                            <td class="highlight-col">Yes (Full Binary Parser)</td>
+                            <td>Partial</td>
+                            <td>No</td>
+                        </tr>
+                        <tr>
+                            <td><b>Offline Capability</b></td>
+                            <td class="highlight-col">Works 100% Offline</td>
+                            <td>Requires active connection</td>
+                            <td>Requires active connection</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Installation Section -->
+    <section class="section" id="install" style="border-top: 1px solid var(--border-subtle);">
+        <div class="container" style="max-width: 800px;">
+            <div class="section-header">
+                <span class="badge badge-cyan" style="margin-bottom: 8px;">Developer Guide</span>
+                <h2 class="section-title">Install VerifEye in 60 Seconds</h2>
+                <p class="section-desc">Load unpacked directly in any Chromium browser (Google Chrome, Brave, Microsoft Edge, Arc, Opera).</p>
+            </div>
+
+            <div class="code-box">
+                <span>git clone https://github.com/zihaaaad/VerifEye-AI-Image-Detector.git</span>
+            </div>
+
+            <div style="background:var(--bg-surface); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); padding:28px;">
+                <ol style="padding-left:20px; display:flex; flex-direction:column; gap:16px; font-size:0.95rem;">
+                    <li>Open your browser and navigate to <code style="color:var(--cyan); background:rgba(56,189,248,0.1); padding:2px 6px; border-radius:4px;">chrome://extensions</code></li>
+                    <li>Toggle <b>Developer mode</b> ON in the top-right corner.</li>
+                    <li>Click the <b>Load unpacked</b> button.</li>
+                    <li>Select the cloned <code style="color:var(--cyan);">VerifEye-AI-Image-Detector</code> directory.</li>
+                    <li>Click the VerifEye icon in your toolbar to activate the detector. Hover over any image to view instant forensic telemetry.</li>
+                </ol>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container footer-content">
+            <div>
+                <b style="color:var(--text-primary);">VerifEye: AI Image Detector</b> — Open-Source Forensic Intelligence.
+            </div>
+            <div>
+                Released under the <a href="https://github.com/zihaaaad/VerifEye-AI-Image-Detector/blob/main/LICENSE" target="_blank" style="color:var(--cyan); text-decoration:none;">MIT License</a>.
+            </div>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

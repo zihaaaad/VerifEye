@@ -1,83 +1,454 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>VerifEye Settings</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VerifEye Settings & Forensics Lab</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f0f2f5;
-            color: #2D3748; /* Dark Blue from logo */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --surface-hover: #334155;
+            --border: #334155;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-hover: #0284c7;
+            --green: #22c55e;
+            --yellow: #f59e0b;
+            --red: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
             margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            padding: 30px 20px;
+            line-height: 1.5;
             display: flex;
             justify-content: center;
-            align-items: center;
-            height: 100vh;
         }
+
         .container {
-            background-color: white;
-            padding: 30px 40px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            width: 500px;
+            max-width: 860px;
+            width: 100%;
         }
-        h1 {
-            font-size: 24px;
-            margin-top: 0;
-            font-weight: 700;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 15px;
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand h1 {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+
+        .brand span {
+            color: var(--accent);
+        }
+
+        .badge-version {
+            font-size: 11px;
+            font-weight: 600;
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent);
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background-color: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
             margin-bottom: 20px;
         }
+
+        .card h2 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        /* Radio Options */
+        .option-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .option-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: rgba(15, 23, 42, 0.5);
+            cursor: pointer;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+
+        .option-card:hover {
+            border-color: var(--accent);
+            background: rgba(56, 189, 248, 0.05);
+        }
+
+        .option-card.selected {
+            border-color: var(--accent);
+            background: rgba(56, 189, 248, 0.1);
+        }
+
+        .option-card input[type="radio"] {
+            margin-top: 3px;
+            accent-color: var(--accent);
+        }
+
+        .option-title {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .option-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .tag-free {
+            background: rgba(34, 197, 94, 0.2);
+            color: var(--green);
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+        }
+
+        /* Form Controls */
         label {
             display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            font-size: 14px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text);
         }
-        input[type="password"] {
+
+        input[type="text"],
+        input[type="password"],
+        select {
             width: 100%;
-            padding: 12px;
-            margin-bottom: 25px;
-            border: 1px solid #cbd5e0;
+            padding: 10px 12px;
+            background-color: var(--bg);
+            border: 1px solid var(--border);
             border-radius: 6px;
-            box-sizing: border-box;
-            font-size: 16px;
+            color: var(--text);
+            font-size: 13px;
+            margin-bottom: 12px;
+            outline: none;
+            transition: border-color 0.2s;
         }
-        button {
-            padding: 12px 24px;
-            background-color: #2D3748; /* Dark Blue */
-            color: white;
+
+        input:focus, select:focus {
+            border-color: var(--accent);
+        }
+
+        .input-group {
+            position: relative;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 18px;
+            background-color: var(--accent);
+            color: #0f172a;
             border: none;
-            cursor: pointer;
             border-radius: 6px;
-            font-size: 16px;
-            font-weight: 500;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
             transition: background-color 0.2s;
         }
-        button:hover {
-            background-color: #1A202C;
+
+        .btn:hover {
+            background-color: var(--accent-hover);
         }
-        #status {
-            margin-top: 20px;
-            font-weight: 500;
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
         }
-        p {
-            font-size: 14px;
-            color: #718096;
-            line-height: 1.5;
+
+        .btn-outline:hover {
+            background: var(--surface-hover);
+            border-color: var(--text-muted);
+        }
+
+        /* Signal Checkboxes */
+        .checkbox-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .checkbox-item input {
+            accent-color: var(--accent);
+        }
+
+        /* Live Tester */
+        .test-box {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 18px;
+            text-align: center;
+            background: rgba(15, 23, 42, 0.4);
+            cursor: pointer;
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
+
+        .test-box:hover {
+            border-color: var(--accent);
+        }
+
+        #testResultBox {
+            display: none;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            margin-top: 12px;
+        }
+
+        .gauge-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .gauge-score {
+            font-size: 20px;
+            font-weight: 800;
+        }
+
+        .gauge-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .gauge-fill {
+            height: 100%;
+            transition: width 0.4s ease;
+        }
+
+        #statusMsg {
+            font-size: 13px;
+            font-weight: 600;
+            margin-top: 10px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>VerifEye Settings</h1>
-        <p>To get started, please enter your Gemini API key. You can get a free key from the Google AI Studio.</p>
-        <label for="apiKey">Your Gemini API Key:</label>
-        <input type="password" id="apiKey" placeholder="Enter your API key here">
-        <button id="saveBtn">Save Key</button>
-        <div id="status"></div>
+        <header>
+            <div class="brand">
+                <img src="../assets/icon48.png" width="32" height="32" alt="VerifEye Logo">
+                <h1>Verif<span>Eye</span></h1>
+                <span class="badge-version">v2.0 Open Source</span>
+            </div>
+            <div id="statusMsg"></div>
+        </header>
+
+        <div class="grid">
+            <!-- Left Column: Detection Engine Settings -->
+            <div>
+                <div class="card">
+                    <h2>Detection Engine</h2>
+                    <p>Choose whether to run completely offline with open-source algorithms, or connect a cloud model.</p>
+
+                    <div class="option-group">
+                        <label class="option-card selected" id="optLocal">
+                            <input type="radio" name="engineMode" value="local" checked>
+                            <div>
+                                <div class="option-title">Local Offline Engine <span class="tag-free">100% Free &amp; Private</span></div>
+                                <div class="option-desc">Uses 2D FFT, Noise Residual, ELA, and Metadata forensics locally in your browser. Zero API key needed.</div>
+                            </div>
+                        </label>
+
+                        <label class="option-card" id="optHybrid">
+                            <input type="radio" name="engineMode" value="hybrid">
+                            <div>
+                                <div class="option-title">Hybrid Engine</div>
+                                <div class="option-desc">Instant local algorithmic scan combined with Google Gemini cloud vision verification.</div>
+                            </div>
+                        </label>
+
+                        <label class="option-card" id="optCloud">
+                            <input type="radio" name="engineMode" value="cloud">
+                            <div>
+                                <div class="option-title">Cloud API Only</div>
+                                <div class="option-desc">Direct multimodal analysis using your personal Gemini API key.</div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <label for="sensitivity">Sensitivity Profile:</label>
+                    <select id="sensitivity">
+                        <option value="balanced" selected>Balanced (Recommended)</option>
+                        <option value="strict">Strict (Higher AI detection rate)</option>
+                        <option value="relaxed">Relaxed (Conservative / Low false positives)</option>
+                    </select>
+
+                    <button id="saveEngineBtn" class="btn">Save Engine Settings</button>
+                </div>
+
+                <div class="card">
+                    <h2>Active Forensic Signals</h2>
+                    <p>Toggle individual open-source forensic detectors:</p>
+                    <div class="checkbox-list">
+                        <label class="checkbox-item">
+                            <input type="checkbox" id="sigMetadata" checked>
+                            <span><b>Metadata &amp; Provenance:</b> Scan PNG/EXIF/C2PA tags</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" id="sigFft" checked>
+                            <span><b>2D FFT Frequency:</b> Generative grid &amp; upsampling peaks</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" id="sigNoise" checked>
+                            <span><b>Noise Residual:</b> Laplacian variance &amp; synthetic smoothing</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" id="sigEla" checked>
+                            <span><b>Error Level (ELA):</b> Compression &amp; block consistency</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" id="sigColor" checked>
+                            <span><b>Color &amp; Optics:</b> Radial lens chromatic dispersion</span>
+                        </label>
+                    </div>
+                    <button id="saveSignalsBtn" class="btn btn-outline">Save Signals</button>
+                </div>
+            </div>
+
+            <!-- Right Column: API Settings & Live Tester -->
+            <div>
+                <div class="card">
+                    <h2>Optional Cloud API (Gemini)</h2>
+                    <p>Only needed if you selected <b>Hybrid</b> or <b>Cloud</b> mode above.</p>
+
+                    <label for="apiKey">Google Gemini API Key:</label>
+                    <input type="password" id="apiKey" placeholder="AIzaSy...">
+
+                    <label for="geminiModel">Model Version:</label>
+                    <select id="geminiModel">
+                        <option value="gemini-1.5-flash" selected>Gemini 1.5 Flash (Fast &amp; Accurate)</option>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                        <option value="gemini-flash-latest">Gemini Flash Latest</option>
+                    </select>
+
+                    <div style="display: flex; gap: 8px;">
+                        <button id="saveApiKeyBtn" class="btn">Save API Key</button>
+                        <button id="clearApiKeyBtn" class="btn btn-outline">Clear Key</button>
+                    </div>
+                </div>
+
+                <!-- Interactive Test Lab -->
+                <div class="card">
+                    <h2>Live Forensics Test Lab</h2>
+                    <p>Test any image instantly to verify the open-source detection engine:</p>
+
+                    <label for="testImageUrl">Image URL:</label>
+                    <input type="text" id="testImageUrl" placeholder="https://example.com/image.jpg">
+                    
+                    <div style="margin-bottom: 12px;">
+                        <button id="testUrlBtn" class="btn" style="width: 100%;">Analyze URL</button>
+                    </div>
+
+                    <div class="test-box" id="dropZone">
+                        <div style="font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 4px;">Choose File or Drop Image</div>
+                        <div style="font-size: 12px; color: var(--text-muted);">Click to browse local files</div>
+                        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                    </div>
+
+                    <div id="testResultBox">
+                        <div class="gauge-container">
+                            <span id="resClassification" style="font-weight: 700; font-size: 14px;"></span>
+                            <span id="resProbability" class="gauge-score"></span>
+                        </div>
+                        <div class="gauge-bar">
+                            <div id="resBar" class="gauge-fill"></div>
+                        </div>
+                        <div id="resEngine" style="font-size: 11px; color: var(--accent); margin-bottom: 6px;"></div>
+                        <ul id="resReasons" style="font-size: 12px; color: var(--text-muted); padding-left: 16px;"></ul>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    <script src="settings.js"></script>
+
+    <script src="settings.js" type="module"></script>
 </body>
 </html>

@@ -1,31 +1,57 @@
-let isExtensionEnabled = false;
+/**
+ * VerifEye Content Script
+ * Captures image hover events, communicates with background forensic engine,
+ * and renders a viewport-aware real-time detection tooltip.
+ */
+
+let isExtensionEnabled = true;
 let currentTooltip = null;
 let hoverTimeout = null;
-let currentElement = null;
-let port;
+let currentTargetElement = null;
+let currentTargetUrl = null;
+let port = null;
 
-function connect() {
-    port = chrome.runtime.connect({ name: "verifeye_port" });
-    port.onMessage.addListener(handleBackgroundMessage);
-    port.onDisconnect.addListener(() => { port = null; });
-}
+// Lightweight in-memory LRU cache for instant (0ms) re-hover results
+const resultCache = new Map();
+const MAX_CACHE_SIZE = 60;
 
-function handleBackgroundMessage(response) {
-    if (currentElement && (currentElement.src === response.imageUrl || getElementBgImage(currentElement) === response.imageUrl)) {
-        if (response.action === 'showResult') {
-            updateTooltip(response.result, "success");
-        } else if (response.action === 'showError') {
-            updateTooltip(response.error, "error");
-        }
+function connectPort() {
+    try {
+        port = chrome.runtime.connect({ name: "verifeye_port" });
+        port.onMessage.addListener(handleBackgroundMessage);
+        port.onDisconnect.addListener(() => {
+            port = null;
+        });
+    } catch (e) {
+        port = null;
     }
 }
 
-connect();
+function handleBackgroundMessage(response) {
+    if (!currentTargetUrl || (response.imageUrl !== currentTargetUrl)) return;
+
+    if (response.action === 'showResult') {
+        const result = response.result;
+        resultCache.set(response.imageUrl, result);
+        if (resultCache.size > MAX_CACHE_SIZE) {
+            const firstKey = resultCache.keys().next().value;
+            resultCache.delete(firstKey);
+        }
+        updateTooltip(result);
+    } else if (response.action === 'showError') {
+        updateTooltipError(response.error);
+    }
+}
+
+connectPort();
+
+// Initialize enabled state
 chrome.storage.sync.get('isEnabled', (data) => {
-    isExtensionEnabled = data.isEnabled || false;
+    isExtensionEnabled = data.isEnabled !== undefined ? data.isEnabled : true;
 });
+
 chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'sync' && changes.isEnabled) {
+    if (area === 'sync' && changes.isEnabled !== undefined) {
         isExtensionEnabled = changes.isEnabled.newValue;
         if (!isExtensionEnabled) removeTooltip();
     }
@@ -36,8 +62,7 @@ function getElementBgImage(element) {
     const style = window.getComputedStyle(element);
     const bgImage = style.backgroundImage;
     if (bgImage && bgImage !== 'none') {
-        // Extract URL from 'url("...")'
-        const urlMatch = bgImage.match(/url\("?(.+?)"?\)/);
+        const urlMatch = bgImage.match(/url\(['"]?(.+?)['"]?\)/);
         return urlMatch ? urlMatch[1] : null;
     }
     return null;
@@ -48,73 +73,147 @@ function handleMouseOver(event) {
 
     const element = event.target;
     let imageUrl = null;
-    let isBg = false;
 
-    // Case 1: Standard <img> tag
+    // 1. Standard <img> tag
     if (element.tagName === 'IMG' && element.src) {
-        if (element.naturalWidth < 150 || element.naturalHeight < 150) return;
+        // Skip tiny icons/avatars/tracking pixels
+        const rect = element.getBoundingClientRect();
+        if (rect.width < 100 || rect.height < 100) return;
         imageUrl = element.src;
     }
-    // Case 2: <div> with background-image
+    // 2. CSS background-image
     else {
         const bgUrl = getElementBgImage(element);
         if (bgUrl) {
+            const rect = element.getBoundingClientRect();
+            if (rect.width < 100 || rect.height < 100) return;
             imageUrl = bgUrl;
-            isBg = true;
         }
     }
 
     if (!imageUrl) return;
 
-    currentElement = element;
+    currentTargetElement = element;
+    currentTargetUrl = imageUrl;
+
     clearTimeout(hoverTimeout);
     hoverTimeout = setTimeout(() => {
-        showTooltip(element, "Analyzing...");
-        if (!port) connect();
-        try {
-            port.postMessage({ action: 'analyzeImage', imageUrl: imageUrl });
-        } catch(e) {
-            connect();
-            port.postMessage({ action: 'analyzeImage', imageUrl: imageUrl });
+        // Check cache first
+        if (resultCache.has(imageUrl)) {
+            showTooltip(element);
+            updateTooltip(resultCache.get(imageUrl));
+            return;
         }
-    }, 400);
+
+        showTooltip(element);
+        sendAnalysisRequest(imageUrl);
+    }, 280);
 }
 
 function handleMouseOut() {
     clearTimeout(hoverTimeout);
     removeTooltip();
-    currentElement = null;
+    currentTargetElement = null;
+    currentTargetUrl = null;
 }
 
-function showTooltip(element, text) {
+function sendAnalysisRequest(imageUrl) {
+    if (!port) connectPort();
+
+    if (port) {
+        try {
+            port.postMessage({ action: 'analyzeImage', imageUrl: imageUrl });
+            return;
+        } catch (e) {
+            connectPort();
+        }
+    }
+
+    // Fallback to one-off runtime message
+    chrome.runtime.sendMessage({ action: 'analyzeImage', imageUrl: imageUrl }, (response) => {
+        if (chrome.runtime.lastError) {
+            updateTooltipError("Background engine unavailable");
+            return;
+        }
+        if (response && response.success && currentTargetUrl === imageUrl) {
+            resultCache.set(imageUrl, response.result);
+            updateTooltip(response.result);
+        } else if (response && !response.success && currentTargetUrl === imageUrl) {
+            updateTooltipError(response.error);
+        }
+    });
+}
+
+function showTooltip(element) {
     removeTooltip();
+
     const tooltip = document.createElement('div');
     tooltip.id = 'ai-detector-tooltip';
-    tooltip.innerHTML = `<div class="ai-detector-spinner"></div><span>${text}</span>`;
+    tooltip.innerHTML = `
+        <div class="verifeye-loading">
+            <div class="verifeye-spinner"></div>
+            <span>Analyzing image...</span>
+        </div>
+    `;
+
     document.body.appendChild(tooltip);
     currentTooltip = tooltip;
     positionTooltip(element);
+
+    // Fade in animation
+    requestAnimationFrame(() => {
+        tooltip.classList.add('verifeye-visible');
+    });
 }
 
-function updateTooltip(data, status) {
+function updateTooltip(result) {
     if (!currentTooltip) return;
-    if (status === "error") {
-        currentTooltip.className = 'verifeye-error';
-        currentTooltip.innerHTML = `<span>Error</span>`;
-        return;
+
+    const prob = result.probability !== undefined ? result.probability : 50;
+    const classification = result.classification || (prob >= 70 ? 'Likely AI' : prob >= 35 ? 'Uncertain' : 'Likely Real');
+
+    let colorClass = 'verifeye-low';
+    if (prob >= 70) {
+        colorClass = 'verifeye-high';
+    } else if (prob >= 35) {
+        colorClass = 'verifeye-medium';
     }
-    const probability = parseInt(data, 10);
-    if(isNaN(probability)) {
-        currentTooltip.className = 'verifeye-error';
-        currentTooltip.innerHTML = `<span>Invalid Response</span>`;
-        return;
+
+    let engineTag = 'Local';
+    if (result.engine === 'cloud_gemini' || result.engineMode === 'cloud') {
+        engineTag = 'Gemini';
+    } else if (result.engine === 'hybrid' || result.engineMode === 'hybrid') {
+        engineTag = 'Hybrid';
     }
-    let label = 'Likely Real';
-    let className = 'verifeye-low';
-    if (probability > 75) { label = 'Likely AI'; className = 'verifeye-high'; }
-    else if (probability > 30) { label = 'Uncertain'; className = 'verifeye-medium'; }
-    currentTooltip.className = className;
-    currentTooltip.innerHTML = `<span class="verifeye-result">${label}: <b>${probability}%</b></span>`;
+
+    const reasonsList = (result.reasons || []).slice(0, 2).map(r => `<li>${escapeHtml(r)}</li>`).join('');
+
+    currentTooltip.className = `verifeye-visible ${colorClass}`;
+    currentTooltip.innerHTML = `
+        <div class="verifeye-header">
+            <span class="verifeye-badge">${classification} <b>${prob}%</b></span>
+            <span class="verifeye-engine-tag">${engineTag}</span>
+        </div>
+        <div class="verifeye-bar-container">
+            <div class="verifeye-bar" style="width: ${prob}%;"></div>
+        </div>
+        ${reasonsList ? `<ul class="verifeye-reasons">${reasonsList}</ul>` : ''}
+    `;
+
+    if (currentTargetElement) {
+        positionTooltip(currentTargetElement);
+    }
+}
+
+function updateTooltipError(errorText) {
+    if (!currentTooltip) return;
+    currentTooltip.className = 'verifeye-visible verifeye-error';
+    currentTooltip.innerHTML = `
+        <div class="verifeye-header">
+            <span class="verifeye-badge">Notice</span>
+        </div>
+        <div style="font-size: 11px; color: #cbd5e1;">${escapeHtml(errorText || 'Analysis unavailable')}</div>
+    `;
 }
 
 function removeTooltip() {
@@ -124,19 +223,45 @@ function removeTooltip() {
     }
 }
 
+/**
+ * Viewport-Aware Positioning: keeps tooltip within viewport bounds
+ */
 function positionTooltip(element) {
-    if (!currentTooltip) return;
+    if (!currentTooltip || !element) return;
+
     const rect = element.getBoundingClientRect();
-    currentTooltip.style.position = 'fixed';
-    currentTooltip.style.top = `${window.scrollY + rect.top + 5}px`;
-    currentTooltip.style.left = `${window.scrollX + rect.left + 5}px`;
+    const tooltipRect = currentTooltip.getBoundingClientRect();
+
+    const padding = 8;
+    let top = rect.top + 10;
+    let left = rect.left + 10;
+
+    // Viewport boundary clamping
+    const maxTop = window.innerHeight - (tooltipRect.height || 70) - padding;
+    const maxLeft = window.innerWidth - (tooltipRect.width || 220) - padding;
+
+    top = Math.max(padding, Math.min(top, maxTop));
+    left = Math.max(padding, Math.min(left, maxLeft));
+
+    currentTooltip.style.top = `${top}px`;
+    currentTooltip.style.left = `${left}px`;
 }
 
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+// Global Event Listeners with MutationObserver for dynamic websites
 const observer = new MutationObserver((mutationsList) => {
     for (const mutation of mutationsList) {
         if (mutation.type === 'childList') {
             mutation.addedNodes.forEach(node => {
-                if (node.nodeType === 1) { // Is an element node
+                if (node.nodeType === 1) {
                     node.addEventListener('mouseover', handleMouseOver);
                     node.addEventListener('mouseout', handleMouseOut);
                 }
