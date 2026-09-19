@@ -4,20 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VerifEye Settings & Forensics Lab</title>
+    <link rel="icon" type="image/png" href="../assets/icon16.png">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
         
         :root {
-            --bg: #0f172a;
-            --surface: #1e293b;
-            --surface-hover: #334155;
-            --border: #334155;
+            --bg: #090d16;
+            --surface: #131b2e;
+            --surface-hover: #1e293b;
+            --border: #232f48;
+            --border-accent: rgba(56, 189, 248, 0.3);
             --text: #f8fafc;
             --text-muted: #94a3b8;
             --accent: #38bdf8;
             --accent-hover: #0284c7;
             --green: #22c55e;
-            --yellow: #f59e0b;
+            --amber: #f59e0b;
             --red: #ef4444;
         }
 
@@ -38,7 +40,7 @@
         }
 
         .container {
-            max-width: 860px;
+            max-width: 960px;
             width: 100%;
         }
 
@@ -83,7 +85,7 @@
             gap: 20px;
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 820px) {
             .grid { grid-template-columns: 1fr; }
         }
 
@@ -125,7 +127,7 @@
             padding: 12px;
             border-radius: 8px;
             border: 1px solid var(--border);
-            background: rgba(15, 23, 42, 0.5);
+            background: rgba(9, 13, 22, 0.5);
             cursor: pointer;
             transition: border-color 0.2s, background-color 0.2s;
         }
@@ -197,18 +199,14 @@
             border-color: var(--accent);
         }
 
-        .input-group {
-            position: relative;
-        }
-
         .btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 6px;
-            padding: 10px 18px;
+            padding: 9px 16px;
             background-color: var(--accent);
-            color: #0f172a;
+            color: #090d16;
             border: none;
             border-radius: 6px;
             font-size: 13px;
@@ -232,6 +230,16 @@
             border-color: var(--text-muted);
         }
 
+        .btn-danger {
+            background: transparent;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: var(--red);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.15);
+        }
+
         /* Signal Checkboxes */
         .checkbox-list {
             display: flex;
@@ -252,13 +260,71 @@
             accent-color: var(--accent);
         }
 
+        /* Telemetry Stats Dashboard */
+        .stats-dashboard {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+
+        .stat-box {
+            background: rgba(9, 13, 22, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .stat-box-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .stat-box-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        /* Domain Tags */
+        .domain-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 12px;
+            min-height: 32px;
+        }
+
+        .domain-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            background: rgba(9, 13, 22, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .domain-remove {
+            cursor: pointer;
+            color: var(--red);
+            font-weight: 700;
+        }
+
         /* Live Tester */
         .test-box {
             border: 2px dashed var(--border);
             border-radius: 8px;
             padding: 18px;
             text-align: center;
-            background: rgba(15, 23, 42, 0.4);
+            background: rgba(9, 13, 22, 0.4);
             cursor: pointer;
             margin-bottom: 12px;
             transition: border-color 0.2s;
@@ -285,7 +351,8 @@
         }
 
         .gauge-score {
-            font-size: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 22px;
             font-weight: 800;
         }
 
@@ -295,7 +362,7 @@
             background: var(--border);
             border-radius: 3px;
             overflow: hidden;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
 
         .gauge-fill {
@@ -303,10 +370,44 @@
             transition: width 0.4s ease;
         }
 
+        /* Signal Telemetry Meter Grid */
+        .signals-meter-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
+            font-size: 11px;
+        }
+
+        .meter-item {
+            background: rgba(19, 27, 46, 0.7);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px;
+        }
+
+        .meter-title {
+            color: var(--text-muted);
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .meter-val {
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 700;
+        }
+
+        #spectrumContainer {
+            margin-top: 10px;
+            border-top: 1px solid var(--border);
+            padding-top: 10px;
+        }
+
         #statusMsg {
             font-size: 13px;
             font-weight: 600;
-            margin-top: 10px;
         }
     </style>
 </head>
@@ -322,8 +423,9 @@
         </header>
 
         <div class="grid">
-            <!-- Left Column: Detection Engine Settings -->
+            <!-- Left Column: Detection Engine & Telemetry -->
             <div>
+                <!-- Detection Engine Settings -->
                 <div class="card">
                     <h2>Detection Engine</h2>
                     <p>Choose whether to run completely offline with open-source algorithms, or connect a cloud model.</p>
@@ -364,13 +466,14 @@
                     <button id="saveEngineBtn" class="btn">Save Engine Settings</button>
                 </div>
 
+                <!-- Forensic Signals -->
                 <div class="card">
                     <h2>Active Forensic Signals</h2>
                     <p>Toggle individual open-source forensic detectors:</p>
                     <div class="checkbox-list">
                         <label class="checkbox-item">
                             <input type="checkbox" id="sigMetadata" checked>
-                            <span><b>Metadata &amp; Provenance:</b> Scan PNG/EXIF/C2PA tags</span>
+                            <span><b>Metadata &amp; Provenance:</b> PNG/EXIF/C2PA header scan</span>
                         </label>
                         <label class="checkbox-item">
                             <input type="checkbox" id="sigFft" checked>
@@ -388,16 +491,67 @@
                             <input type="checkbox" id="sigColor" checked>
                             <span><b>Color &amp; Optics:</b> Radial lens chromatic dispersion</span>
                         </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" id="sigCfa" checked>
+                            <span><b>CFA Lattice:</b> Bayer demosaicing trace (argues for camera only)</span>
+                        </label>
+                        <label class="checkbox-item">
+                            <input type="checkbox" id="sigJpegQuant" checked>
+                            <span><b>Encoder Fingerprint:</b> JPEG quantization table vs IJG Annex K</span>
+                        </label>
                     </div>
                     <button id="saveSignalsBtn" class="btn btn-outline">Save Signals</button>
                 </div>
+
+                <!-- Domain Exclusions -->
+                <div class="card">
+                    <h2>Excluded Domains</h2>
+                    <p>Disable hover detection on specific websites:</p>
+                    
+                    <div class="domain-list" id="domainList">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="newDomainInput" placeholder="e.g. github.com" style="margin-bottom: 0;">
+                        <button id="addDomainBtn" class="btn btn-outline">Add</button>
+                    </div>
+                </div>
+
+                <!-- Telemetry Dashboard -->
+                <div class="card">
+                    <h2>Lifetime Telemetry Stats</h2>
+                    <p>Images scanned and classified during this browser profile session:</p>
+                    
+                    <div class="stats-dashboard">
+                        <div class="stat-box">
+                            <div class="stat-box-val" id="statTotal">0</div>
+                            <div class="stat-box-label">Scanned</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-val" id="statAi" style="color: var(--red);">0</div>
+                            <div class="stat-box-label">AI Flagged</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-val" id="statReal" style="color: var(--green);">0</div>
+                            <div class="stat-box-label">Authentic</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-box-val" id="statUncertain" style="color: var(--amber);">0</div>
+                            <div class="stat-box-label">Uncertain</div>
+                        </div>
+                    </div>
+
+                    <button id="resetStatsBtn" class="btn btn-danger" style="font-size: 11px; padding: 6px 12px;">Reset Statistics</button>
+                </div>
             </div>
 
-            <!-- Right Column: API Settings & Live Tester -->
+            <!-- Right Column: API Settings & Live Forensics Lab -->
             <div>
+                <!-- Cloud API Key -->
                 <div class="card">
                     <h2>Optional Cloud API (Gemini)</h2>
-                    <p>Only needed if you selected <b>Hybrid</b> or <b>Cloud</b> mode above.</p>
+                    <p>Only needed if you selected <b>Hybrid</b> or <b>Cloud</b> mode.</p>
 
                     <label for="apiKey">Google Gemini API Key:</label>
                     <input type="password" id="apiKey" placeholder="AIzaSy...">
@@ -409,8 +563,9 @@
                         <option value="gemini-flash-latest">Gemini Flash Latest</option>
                     </select>
 
-                    <div style="display: flex; gap: 8px;">
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                         <button id="saveApiKeyBtn" class="btn">Save API Key</button>
+                        <button id="testApiKeyBtn" class="btn btn-outline">Test Connection</button>
                         <button id="clearApiKeyBtn" class="btn btn-outline">Clear Key</button>
                     </div>
                 </div>
@@ -418,7 +573,7 @@
                 <!-- Interactive Test Lab -->
                 <div class="card">
                     <h2>Live Forensics Test Lab</h2>
-                    <p>Test any image instantly to verify the open-source detection engine:</p>
+                    <p>Test any image instantly with real-time multi-signal telemetry:</p>
 
                     <label for="testImageUrl">Image URL:</label>
                     <input type="text" id="testImageUrl" placeholder="https://example.com/image.jpg">
@@ -429,20 +584,54 @@
 
                     <div class="test-box" id="dropZone">
                         <div style="font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 4px;">Choose File or Drop Image</div>
-                        <div style="font-size: 12px; color: var(--text-muted);">Click to browse local files</div>
+                        <div style="font-size: 12px; color: var(--text-muted);">Decodes RGBA and executes 2D FFT locally</div>
                         <input type="file" id="fileInput" accept="image/*" style="display: none;">
                     </div>
 
                     <div id="testResultBox">
                         <div class="gauge-container">
-                            <span id="resClassification" style="font-weight: 700; font-size: 14px;"></span>
+                            <span id="resClassification" style="font-weight: 700; font-size: 15px;"></span>
                             <span id="resProbability" class="gauge-score"></span>
                         </div>
                         <div class="gauge-bar">
                             <div id="resBar" class="gauge-fill"></div>
                         </div>
-                        <div id="resEngine" style="font-size: 11px; color: var(--accent); margin-bottom: 6px;"></div>
-                        <ul id="resReasons" style="font-size: 12px; color: var(--text-muted); padding-left: 16px;"></ul>
+
+                        <!-- Multi-signal Telemetry Grid -->
+                        <div class="signals-meter-grid">
+                            <div class="meter-item">
+                                <div class="meter-title"><span>2D FFT Grid</span><span id="telFft" class="meter-val">--</span></div>
+                            </div>
+                            <div class="meter-item">
+                                <div class="meter-title"><span>Noise Kurtosis</span><span id="telNoise" class="meter-val">--</span></div>
+                            </div>
+                            <div class="meter-item">
+                                <div class="meter-title"><span>Error Level (ELA)</span><span id="telEla" class="meter-val">--</span></div>
+                            </div>
+                            <div class="meter-item">
+                                <div class="meter-title"><span>Color Optics</span><span id="telColor" class="meter-val">--</span></div>
+                            </div>
+                            <div class="meter-item">
+                                <div class="meter-title"><span>CFA Lattice</span><span id="telCfa" class="meter-val">--</span></div>
+                            </div>
+                            <div class="meter-item">
+                                <div class="meter-title"><span>Encoder</span><span id="telQuant" class="meter-val">--</span></div>
+                            </div>
+                        </div>
+
+                        <div id="resBand" style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px; font-variant-numeric: tabular-nums;"></div>
+
+                        <div id="resEngine" style="font-size: 11px; color: var(--accent); margin-bottom: 8px;"></div>
+                        <ul id="resReasons" style="font-size: 12px; color: var(--text-muted); padding-left: 16px; margin-bottom: 10px;"></ul>
+
+                        <!-- FFT Spectrum Canvas -->
+                        <div id="spectrumContainer">
+                            <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">
+                                Measured 2D Fourier Magnitude Spectrum |F(u,v)|
+                            </div>
+                            <canvas id="labFftCanvas" width="256" height="256" style="width: 100%; max-width: 256px; height: auto; border-radius: 4px; background: #020305; image-rendering: pixelated;"></canvas>
+                            <div id="labSpectrumCaption" style="font-size: 10px; color: var(--text-muted); margin-top: 6px; font-variant-numeric: tabular-nums;"></div>
+                        </div>
                     </div>
                 </div>
             </div>

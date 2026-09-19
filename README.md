@@ -1,112 +1,220 @@
-# VerifEye: AI Image Detector
+# VerifEye
 
-VerifEye is a real-time, local-first Chrome extension that detects AI-generated images (Stable Diffusion, Midjourney, DALL-E, Flux, Imagen) on hover using open-source forensic algorithms, with optional cloud API verification.
+**Image forensics that runs in your browser.** Hover any image on any page and VerifEye
+reads the physical traces a camera leaves and a neural decoder does not — sensor noise,
+the Bayer demosaicing lattice, Fourier harmonics, compression history, provenance
+metadata — then fuses them into a verdict with the uncertainty it actually carries.
 
-![VerifEye Demo](https://i.ibb.co.com/8LY5zcWK/3.png)
-
----
-
-## Key Highlights in v2.0
-
-* **Zero API Required (Works 100% Offline):** Runs open-source forensic algorithms directly inside the browser. No API keys, subscriptions, or external network calls required.
-* **Instant Hover Analysis (<20ms):** Powered by an in-browser 2D Fast Fourier Transform (FFT) and Laplacian noise residual analyzer.
-* **Multi-Engine Flexibility:**
-  1. **Local Offline Engine (Default):** Free, private, and fully offline.
-  2. **Hybrid Engine:** Instant local scan backed by optional Google Gemini multimodal verification.
-  3. **Cloud API Mode:** Direct Gemini vision analysis.
-* **Explainable Forensic Indicators:** Provides transparent technical explanations for why an image was flagged (e.g., *"Generative frequency grid detected"*, *"Synthetic diffusion smoothing"*, *"Stable Diffusion metadata confirmed"*).
-* **Viewport-Aware Glassmorphism UI:** Non-intrusive tooltip with calibrated indicator levels (Likely Real, Uncertain, Likely AI).
-
----
-
-## Forensic Algorithm Architecture
-
-VerifEye uses a multi-signal forensic ensemble that inspects both binary provenance metadata and mathematical pixel-level properties:
+No uploads. No API keys required. No network calls in the default mode. Zero runtime
+dependencies.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           Hovered Image                                 │
-└────────────────────────────────────┬────────────────────────────────────┘
-                                     │
-    ┌────────────────────────────────┼────────────────────────────────┐
-    ▼                                ▼                                ▼
-┌───────────────────────┐  ┌───────────────────────┐  ┌───────────────────────┐
-│  Layer 1: Metadata    │  │  Layer 2: Frequency   │  │   Layer 3: Noise &    │
-│  & C2PA Provenance    │  │  2D FFT Grid Spectrum │  │   Texture Residual    │
-├───────────────────────┤  ├───────────────────────┤  ├───────────────────────┤
-│ • PNG tEXt/iTXt scan  │  │ • 2D Radix-2 FFT      │  │ • 3x3 Laplacian filter│
-│ • EXIF / XMP headers  │  │ • Periodic grid peaks │  │ • Kurtosis & PRNU     │
-│ • Stable Diffusion /  │  │ • Radial power decay  │  │ • Synthetic smoothing │
-│   ComfyUI / Midjourney│  │   (1/f^a slope)       │  │   detection           │
-└───────────┬───────────┘  └───────────┬───────────┘  └───────────┬───────────┘
-            │                          │                          │
-            └──────────────────────────┼──────────────────────────┘
-                                       ▼
-                       ┌───────────────────────────────┐
-                       │  Calibrated Multi-Signal      │
-                       │  Ensemble Aggregator (0-100%) │
-                       └───────────────┬───────────────┘
-                                       │
-                      ┌────────────────┴────────────────┐
-                      ▼                                 ▼
-         [Local Engine: Instant]             [Optional Cloud API]
+┌─ Verdict ────────────────────────────────────┐
+│  Likely Real          18%                    │
+│  Plausible range 9–31% · agreement 87%       │
+│                                              │
+│  cfa        ████████▌              −1.10     │
+│  noise           ██▌               −0.34     │
+│  fft              ▌                +0.08     │
+│  jpegQuant      ███                −0.40     │
+└──────────────────────────────────────────────┘
 ```
 
-### 1. 2D Fast Fourier Transform (FFT) & Spectral Grid Decomposition
-Generative neural networks (Transposed Convolutions, PixelShuffle, VAE decoders) leave periodic checkerboard artifacts in the frequency domain. VerifEye computes a 2D FFT on luminance patches with a 2D Hann window, measuring:
-- Isolated high-frequency spectral harmonic spikes (>3 sigma above neighborhood median).
-- Deviations from the natural image power law distribution (P(f) ~ 1/f^2).
+---
 
-### 2. Sensor Noise Residual & Laplacian Variance (PRNU)
-Real physical camera sensors produce Poisson-Gaussian noise (Photo-Response Non-Uniformity). In contrast, iterative diffusion schedulers create unnatural texture oversmoothing. VerifEye calculates:
-- Residual kurtosis anomaly (detecting non-Gaussian synthetic grain).
-- Patch-based spatial variance ratios across flat regions (skin, sky, backgrounds).
+## What it actually measures
 
-### 3. Binary Metadata & C2PA Provenance Parser
-Inspects raw image binary headers (PNG chunks, EXIF `UserComment`, JPEG `APP1`/`APP2`, XMP packets, WebP `RIFF` chunks) for:
-- Automatic1111 / ComfyUI / Fooocus parameters and generation prompts.
-- Midjourney job IDs and version flags (`--v 6`, `--ar`).
-- DALL-E / OpenAI XMP generator tags.
-- C2PA Content Credentials manifests (`digitalSourceType: trainedAlgorithmicMedia`).
+Eight analyzers, each reading a different physical or statistical trace. Seven vote;
+one is measured and displayed but deliberately excluded from the verdict.
 
-### 4. Error Level Analysis (ELA) & Compression Consistency
-Evaluates 8x8 block discrete cosine transform (DCT) quantization boundaries and variance spread to detect synthetic inpainting, face swaps, and non-camera compression profiles.
+| Signal | What it reads | Weight |
+| --- | --- | --- |
+| **Metadata** | PNG `tEXt`/`iTXt` chunks, JPEG APP segments, XMP, EXIF, C2PA manifests. Finds A1111 parameters, ComfyUI graphs, Midjourney flags, and camera bodies. | Decisive |
+| **2D FFT** | Radix-2 Fourier transform over Hann-windowed luminance tiles. Hunts the periodic harmonics that transposed convolutions and PixelShuffle upsampling leave behind, and fits the radial power-law slope against the 1/f² natural-image law. | 1.00 |
+| **CFA lattice** | Bayer demosaicing traces. A single-sensor camera measures green on one diagonal parity and *interpolates* the other, so a bilinear residual nearly vanishes on half the pixels. Neural decoders emit every channel at every pixel and leave both parities identical. | 1.10 |
+| **Noise residual** | Laplacian high-pass residual, kurtosis against the Gaussian 3.0, and patch-wise detection of the oversmoothing diffusion models produce on skin and sky. | 0.90 |
+| **Error Level Analysis** | Re-encodes at a known quality and differences the result. Regions carrying a different compression history — a splice, an inpainted patch, a regenerated face — stand out as error-level outliers. | 0.60 |
+| **Color & optics** | Inter-channel Pearson correlation, saturation entropy, and radial chromatic dispersion at peripheral high-contrast edges, which physical glass produces and a decoder does not. | 0.50 |
+| **Encoder fingerprint** | Parses JPEG DQT tables and matches them against the IJG Annex K reference at every quality. Cameras and Adobe ship custom tables; Pillow and libjpeg ship the standard one scaled. | 0.40 |
+| **DCT first-digit law** | Generalized Benford divergence over block-DCT coefficients. **Diagnostic only — see below.** | — |
 
-### 5. Optical Chromatic Aberration & Color Space Analysis
-Physical camera lenses exhibit radial chromatic dispersion (wavelength shift at peripheral edges). VerifEye verifies optical edge dispersion and measures RGB inter-channel correlation.
+### The CFA signal is one-sided, on purpose
+
+A demosaicing lattice proves an optical sensor. Its *absence* proves nothing: any
+resize, crop to an odd offset, or re-encode erases it too. So CFA may push a verdict
+toward "real" and is structurally forbidden from pushing it toward "AI". The fusion
+layer clamps it, and a test asserts the clamp holds.
+
+### Why one signal doesn't vote
+
+`forensics/benford.js` measures correctly and is excluded from scoring anyway.
+
+Tested against 1/f fractional-Brownian references — the closest stand-in for natural
+image statistics available without a labelled corpus — its divergence tracked grain
+amplitude and JPEG quality far more strongly than it tracked whether content was
+synthetic. The ordering even inverted between quality settings: at q=85 an oversmoothed
+surface fitted the law *better* than a natural one. Fusing a statistic that behaves
+like that would add noise to the verdict while looking authoritative.
+
+It stays visible in the UI, labelled as diagnostic. If `npm run calibrate` ever shows
+real separation on a labelled corpus, flip `contributesToScore` and give it a weight.
 
 ---
 
-## Installation & Usage
+## How the verdict is computed
 
-1. **Clone or Download:** Clone this repository or download the ZIP file and extract it.
-2. **Open Chrome Extensions:** Navigate to `chrome://extensions` in Google Chrome.
-3. **Enable Developer Mode:** Turn on the **Developer mode** toggle in the top-right corner.
-4. **Load Unpacked:** Click **Load unpacked** and select the project folder (`VerifEye-AI-Image-Detector`).
-5. **Operation:**
-   - Click the VerifEye icon in your toolbar to turn it ON (badge displays 'ON').
-   - Hover over any image on any website (static or dynamic, like X, Facebook, Instagram, Reddit).
-   - An instant forensic tooltip will appear with the detection score and reasons.
+Signals are combined in **log-odds**, not averaged:
+
+```
+logit(P) = prior + Σ weightᵢ × evidenceᵢ        evidenceᵢ ∈ [−1, +1]
+P        = sigmoid(logit)
+```
+
+Averaging percentages is the wrong operation for combining evidence. Two independent
+signals each saying "70% AI" should move the verdict further than either alone — their
+mean is still 70, their log-odds sum is not. In practice one signal at 70 yields 60%;
+two yield 68%.
+
+Every verdict carries three numbers beyond the headline probability:
+
+- **Band** — a plausible range, widened by signal disagreement and by evidence that
+  could not be gathered. A bare percentage hides both.
+- **Agreement** — how much the contributing signals concur.
+- **Coverage** — how much of the total available evidence weight was actually usable.
+
+### On calibration — read this before trusting a number
+
+**The shipped weights are hand-set priors, not coefficients fitted to labelled data.**
+Every verdict reports `calibrated: false`, and the UI says so.
+
+Read the probabilities as a **ranking**, not as calibrated likelihoods. A 72% is more
+suspicious than a 44%; it is not "72% likely to be AI".
+
+To fix that properly:
+
+```bash
+# 1. Collect signal vectors from labelled images, in the browser
+npx serve .          # then open bench/calibrate.html
+                     # drop in real photos and known-AI images, export corpus.json
+
+# 2. Fit logistic weights and report held-out AUC
+npm run calibrate -- bench/corpus.json
+npm run sync
+```
+
+The fitter **refuses to write weights that fail to beat chance on a held-out split**.
+A fit that only works on its own training data would flip `calibrated` to true and
+invite everyone downstream to trust a number that has not earned it.
 
 ---
 
-## Configuration & Forensics Test Lab
+## Resolution matters
 
-Right-click the extension icon and choose **Options** (or navigate to `settings/settings.html`):
-- **Engine Selection:** Choose between **Local Offline Engine** (default), **Hybrid**, or **Cloud**.
-- **Signal Toggles:** Enable or disable individual forensic detectors (FFT, Noise, ELA, Metadata, Color).
-- **Interactive Test Lab:** Drag-and-drop local image files or paste image URLs to test them in real time with detailed signal metrics.
-- **Optional API Key:** Add a Google Gemini API key if you wish to enable Hybrid or Cloud multimodal verification.
+Lattice evidence only survives at native resolution. Rescaling resamples every pixel,
+erasing the Bayer lattice and shifting the JPEG block grid off its phase — an analyzer
+reading those from a scaled buffer measures the *resize*, not the image.
+
+So `forensics/decode.js` produces two views of every image: a bounded working buffer
+for speed, and an **8-pixel-aligned centre crop at true sensor resolution** for the
+analyzers that need it. Signals that depend on the lattice mark themselves
+uninformative when that crop is unavailable rather than reporting a reading they
+cannot support.
 
 ---
 
-## Privacy & Security
+## Performance
 
-- **Local Mode Privacy:** In the default Local Engine mode, no image data or telemetry leaves your browser. All computations occur client-side using JavaScript and `OffscreenCanvas`.
-- **API Key Security:** Any optional API key entered is stored strictly in Chrome Sync Storage (`chrome.storage.sync`) and is transmitted only to official provider endpoints.
+Measured, not asserted. Run `npm run bench`; results land in
+[`bench/RESULTS.md`](bench/RESULTS.md).
+
+| Input | Full ensemble (median) |
+| --- | --- |
+| 256×256 | ~6 ms |
+| 384×384 *(hover default)* | ~8 ms |
+| 768×768 *(deep scan)* | ~20 ms |
+
+**Scope:** engine time only — decoded RGBA in, fused verdict out. It excludes network
+fetch, image decode and browser scheduling, which usually dominate what you actually
+experience on hover. Treat it as a floor, not an end-to-end promise. It says nothing
+about accuracy; that needs the calibration corpus above.
+
+---
+
+## Install
+
+```bash
+git clone https://github.com/zihaaaad/VerifEye.git
+cd VerifEye
+```
+
+1. Open `chrome://extensions` in Chrome, Brave, Edge or Arc.
+2. Enable **Developer mode** (upper-right toggle).
+3. Click **Load unpacked** and select the project folder (`VerifEye`).
+4. Click the toolbar icon to switch detection on, then hover any image.
+
+**Press `V` while hovering** to run a deep scan: higher working resolution plus true
+recompression ELA, and a rendered FFT spectrum in the tooltip.
+
+---
+
+## Engine modes
+
+| Mode | Behaviour |
+| --- | --- |
+| **Local** *(default)* | Fully offline. Zero network calls. |
+| **Hybrid** | Local signals first; Gemini consulted only when provenance has not already settled it. Blends 40% local / 60% cloud. |
+| **Cloud** | Gemini multimodal evaluation, with local signals still reported alongside. |
+
+Hybrid and Cloud need a Gemini API key, set in the options page. Local mode never
+transmits anything.
+
+---
+
+## Development
+
+```bash
+npm test           # 49 assertions, plus the docs-mirror drift check
+npm run bench      # latency measurements
+npm run sync       # mirror forensics/ into docs/forensics/
+```
+
+GitHub Pages serves the site from `docs/`, and a page there cannot import from a parent
+directory, so the engine genuinely exists twice on disk. `tools/sync-forensics.mjs` is
+the single writer of that mirror, and `npm test` fails if it has drifted — a stale
+mirror would otherwise ship a demo that behaves differently from the extension.
+
+```
+forensics/          the engine — pure functions, no DOM, no dependencies
+  ensemble.js         orchestration and the provenance short-circuit
+  fusion.js           log-odds combination
+  calibration.js      fitted weights, or an honest "not calibrated"
+  decode.js           working buffer + native-resolution crop
+background.js       MV3 service worker: fetch, decode, cache, dispatch
+content.js          hover detection and the tooltip
+docs/               GitHub Pages site + the interactive studio (Web Worker)
+bench/              benchmark harness, corpus collector, calibration fitter
+```
+
+---
+
+## Limits
+
+Stated plainly, because a forensics tool that oversells itself is worse than none:
+
+- **Not calibrated out of the box.** Probabilities rank; they are not likelihoods.
+- **Recompression erases evidence.** An image that has been through a social CDN has
+  usually lost its CFA lattice and its original quantization table. Expect the band to
+  widen and coverage to drop — that is the tool telling you it has less to go on.
+- **Screenshots of real photographs** look synthetic to several signals, because they
+  genuinely are re-rendered pixels.
+- **No signal here is adversarially robust.** Anything that knows about these
+  measurements can defeat them — add plausible grain, re-encode with a camera table,
+  resample to kill the lattice.
+- **A "Likely AI" verdict is evidence, not proof.** Use it to decide what deserves a
+  closer look, never as the sole basis for a claim about a person.
 
 ---
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE).

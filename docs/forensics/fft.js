@@ -5,8 +5,9 @@
  * Diffusion / GAN / VAE upsampling layers.
  */
 
-export function analyzeFrequencyDomain(imageData) {
+export function analyzeFrequencyDomain(imageData, options = {}) {
     const { width, height, data } = imageData;
+    const includeSpectrum = !!options.includeSpectrum;
     const N = 128; // Standard power-of-2 tile size for optimal speed & resolution
 
     if (width < N || height < N) {
@@ -14,25 +15,71 @@ export function analyzeFrequencyDomain(imageData) {
             score: 50,
             confidence: 0,
             gridArtifacts: false,
-            details: ['Image tile too small for frequency decomposition']
+            peakCount: 0,
+            slope: -2.0,
+            hfToMfRatio: 1.0,
+            spectrum: null,
+            details: ['Image dimensions too small for 128x128 2D FFT decomposition']
         };
     }
 
-    // Sample central tile
+    // Extract central tile for primary analysis
     const startX = Math.floor((width - N) / 2);
     const startY = Math.floor((height - N) / 2);
 
-    // Extract Luminance & apply 2D Hann Window
+    const tileResult = computeTileFFT(data, width, startX, startY, N, includeSpectrum);
+
+    // If image is large enough (>= 256x256), sample an additional quadrant to verify consistency
+    let finalScore = tileResult.score;
+    let finalPeaks = tileResult.peakCount;
+    let finalSlope = tileResult.slope;
+    let finalRatio = tileResult.hfToMfRatio;
+    const details = [...tileResult.details];
+
+    if (width >= 256 && height >= 256) {
+        const qX = Math.floor(width * 0.2);
+        const qY = Math.floor(height * 0.2);
+        const qResult = computeTileFFT(data, width, qX, qY, N, false);
+
+        // Merge results
+        finalScore = Math.round(tileResult.score * 0.6 + qResult.score * 0.4);
+        finalPeaks = Math.max(tileResult.peakCount, qResult.peakCount);
+        finalSlope = (tileResult.slope + qResult.slope) / 2;
+        finalRatio = (tileResult.hfToMfRatio + qResult.hfToMfRatio) / 2;
+
+        if (qResult.gridArtifacts && !tileResult.gridArtifacts) {
+            details.push(`Peripheral grid resonance (${qResult.peakCount} harmonic spikes)`);
+        }
+    }
+
+    return {
+        score: finalScore,
+        gridArtifacts: finalPeaks >= 4,
+        peakCount: finalPeaks,
+        slope: Number(finalSlope.toFixed(3)),
+        hfToMfRatio: Number(finalRatio.toFixed(3)),
+        // The actual |F(u,v)| magnitude of the centre tile, DC-shifted and normalized.
+        // Rendering this is the only honest way to show a spectrum to a user.
+        spectrum: tileResult.spectrum,
+        details: details
+    };
+}
+
+/**
+ * Compute 2D FFT on a single NxN tile from image data
+ */
+function computeTileFFT(data, fullWidth, startX, startY, N, includeSpectrum = false) {
     const real = new Float32Array(N * N);
     const imag = new Float32Array(N * N);
 
+    // Extract Luminance & apply 2D Hann Window
     for (let y = 0; y < N; y++) {
         const wy = 0.5 * (1 - Math.cos((2 * Math.PI * y) / (N - 1)));
         for (let x = 0; x < N; x++) {
             const wx = 0.5 * (1 - Math.cos((2 * Math.PI * x) / (N - 1)));
             const windowWeight = wx * wy;
 
-            const pixelIdx = ((startY + y) * width + (startX + x)) * 4;
+            const pixelIdx = ((startY + y) * fullWidth + (startX + x)) * 4;
             const r = data[pixelIdx];
             const g = data[pixelIdx + 1];
             const b = data[pixelIdx + 2];
@@ -108,7 +155,7 @@ export function analyzeFrequencyDomain(imageData) {
         radialAvg[r] = radialCount[r] > 0 ? radialSum[r] / radialCount[r] : 0;
     }
 
-    // Measure deviation from 1/f natural image power law slope
+    // Measure deviation from 1/f natural image power law slope (P(f) ~ 1/f^alpha)
     let logSumX = 0, logSumY = 0, logSumXY = 0, logSumXX = 0;
     let samplePoints = 0;
     for (let r = 3; r < maxRadius - 2; r++) {
@@ -124,8 +171,9 @@ export function analyzeFrequencyDomain(imageData) {
     }
 
     let slope = -2.0; // Expected natural power law slope ~ -1.5 to -2.5
-    if (samplePoints > 5) {
-        slope = (samplePoints * logSumXY - logSumX * logSumY) / (samplePoints * logSumXX - logSumX * logSumX);
+    const denom = samplePoints * logSumXX - logSumX * logSumX;
+    if (samplePoints > 5 && Math.abs(denom) > 1e-7) {
+        slope = (samplePoints * logSumXY - logSumX * logSumY) / denom;
     }
 
     // Ratio of High-Frequency to Mid-Frequency energy
@@ -138,7 +186,7 @@ export function analyzeFrequencyDomain(imageData) {
     // 1. Check for periodic grid upsampling peaks
     if (highFreqPeaks >= 6) {
         spectralScore += 45;
-        details.push(`High-frequency grid peaks (${highFreqPeaks} harmonic spikes detected)`);
+        details.push(`Generative frequency grid detected (${highFreqPeaks} harmonic spikes)`);
     } else if (highFreqPeaks >= 3) {
         spectralScore += 25;
         details.push(`Minor spectral grid resonance (${highFreqPeaks} harmonic spikes)`);
@@ -167,8 +215,52 @@ export function analyzeFrequencyDomain(imageData) {
         peakCount: highFreqPeaks,
         slope: slope,
         hfToMfRatio: hfToMfRatio,
+        spectrum: includeSpectrum ? packSpectrum(magnitude, N) : null,
         details: details
     };
+}
+
+/**
+ * Downsample the shifted log-magnitude spectrum to a compact 64x64 byte map that is
+ * cheap to hand across a message port and can be blitted straight to a canvas.
+ *
+ * Pools by MAXIMUM rather than by average: the whole point of looking at the spectrum
+ * is to see isolated harmonic spikes, and averaging is exactly the operation that
+ * would erase them.
+ */
+function packSpectrum(magnitude, N, outSize = 64) {
+    const factor = Math.max(1, Math.floor(N / outSize));
+    const pooled = new Float32Array(outSize * outSize);
+
+    let min = Infinity;
+    let max = -Infinity;
+
+    for (let y = 0; y < outSize; y++) {
+        for (let x = 0; x < outSize; x++) {
+            let peak = 0;
+            for (let dy = 0; dy < factor; dy++) {
+                const sy = y * factor + dy;
+                if (sy >= N) break;
+                for (let dx = 0; dx < factor; dx++) {
+                    const sx = x * factor + dx;
+                    if (sx >= N) break;
+                    const v = magnitude[sy * N + sx];
+                    if (v > peak) peak = v;
+                }
+            }
+            pooled[y * outSize + x] = peak;
+            if (peak < min) min = peak;
+            if (peak > max) max = peak;
+        }
+    }
+
+    const range = max - min;
+    const out = new Uint8Array(outSize * outSize);
+    for (let i = 0; i < pooled.length; i++) {
+        out[i] = range > 1e-6 ? Math.round(((pooled[i] - min) / range) * 255) : 0;
+    }
+
+    return { size: outSize, data: out, min: Number(min.toFixed(3)), max: Number(max.toFixed(3)) };
 }
 
 /**
@@ -249,7 +341,7 @@ function fft1d(real, imag, n) {
         j += k;
     }
 
-    // Cooley-Tukey computation
+    // Cooley-Tukey butterfly computation
     for (let len = 2; len <= n; len <<= 1) {
         const halfLen = len >> 1;
         const angle = (-2 * Math.PI) / len;

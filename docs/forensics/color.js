@@ -11,14 +11,18 @@ export function analyzeColor(imageData) {
         return {
             score: 50,
             hasLensAberration: false,
-            details: ['Image too small for chromatic analysis']
+            avgDispersion: 0,
+            corrRG: 0,
+            corrGB: 0,
+            satEntropy: 0,
+            details: ['Image dimensions too small for chromatic analysis']
         };
     }
 
     const totalPixels = width * height;
     let sumR = 0, sumG = 0, sumB = 0;
     let sumRR = 0, sumGG = 0, sumBB = 0;
-    let sumRG = 0, sumGB = 0;
+    let sumRG = 0, sumGB = 0, sumRB = 0;
 
     // Saturation histogram (16 bins)
     const satHistogram = new Int32Array(16);
@@ -31,7 +35,7 @@ export function analyzeColor(imageData) {
 
         sumR += r; sumG += g; sumB += b;
         sumRR += r * r; sumGG += g * g; sumBB += b * b;
-        sumRG += r * g; sumGB += g * b;
+        sumRG += r * g; sumGB += g * b; sumRB += r * b;
 
         // Calculate saturation: (max - min) / max
         const max = Math.max(r, g, b);
@@ -130,9 +134,10 @@ export function analyzeColor(imageData) {
     return {
         score: colorScore,
         hasLensAberration: hasLensAberration,
-        avgDispersion: avgDispersion,
-        corrRG: corrRG,
-        satEntropy: satEntropy,
+        avgDispersion: Number(avgDispersion.toFixed(2)),
+        corrRG: Number(corrRG.toFixed(3)),
+        corrGB: Number(corrGB.toFixed(3)),
+        satEntropy: Number(satEntropy.toFixed(2)),
         details: details
     };
 }

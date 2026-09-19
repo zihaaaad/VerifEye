@@ -1,10 +1,11 @@
 /**
  * VerifEye Content Script
  * Captures image hover events, communicates with background forensic engine,
- * and renders a viewport-aware real-time detection tooltip.
+ * and renders a viewport-aware real-time detection tooltip with deep element resolution.
  */
 
 let isExtensionEnabled = true;
+let excludedDomains = [];
 let currentTooltip = null;
 let hoverTimeout = null;
 let currentTargetElement = null;
@@ -13,7 +14,7 @@ let port = null;
 
 // Lightweight in-memory LRU cache for instant (0ms) re-hover results
 const resultCache = new Map();
-const MAX_CACHE_SIZE = 60;
+const MAX_CACHE_SIZE = 80;
 
 function connectPort() {
     try {
@@ -32,7 +33,8 @@ function handleBackgroundMessage(response) {
 
     if (response.action === 'showResult') {
         const result = response.result;
-        resultCache.set(response.imageUrl, result);
+        // A deep scan result supersedes the fast one for the same image.
+        resultCache.set(cacheKeyFor(response.imageUrl, response.deepScan), result);
         if (resultCache.size > MAX_CACHE_SIZE) {
             const firstKey = resultCache.keys().next().value;
             resultCache.delete(firstKey);
@@ -45,17 +47,31 @@ function handleBackgroundMessage(response) {
 
 connectPort();
 
-// Initialize enabled state
-chrome.storage.sync.get('isEnabled', (data) => {
+// Initialize enabled state and domain exclusions
+chrome.storage.sync.get(['isEnabled', 'excludedDomains'], (data) => {
     isExtensionEnabled = data.isEnabled !== undefined ? data.isEnabled : true;
+    excludedDomains = data.excludedDomains || [];
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === 'sync' && changes.isEnabled !== undefined) {
-        isExtensionEnabled = changes.isEnabled.newValue;
-        if (!isExtensionEnabled) removeTooltip();
+    if (area === 'sync') {
+        if (changes.isEnabled !== undefined) {
+            isExtensionEnabled = changes.isEnabled.newValue;
+            if (!isExtensionEnabled) removeTooltip();
+        }
+        if (changes.excludedDomains !== undefined) {
+            excludedDomains = changes.excludedDomains.newValue || [];
+        }
     }
 });
+
+function isCurrentDomainExcluded() {
+    const hostname = window.location.hostname.toLowerCase();
+    return excludedDomains.some(domain => {
+        const d = domain.trim().toLowerCase();
+        return d && (hostname === d || hostname.endsWith('.' + d));
+    });
+}
 
 function getElementBgImage(element) {
     if (!element) return null;
@@ -68,61 +84,143 @@ function getElementBgImage(element) {
     return null;
 }
 
-function handleMouseOver(event) {
-    if (!isExtensionEnabled) return;
+/**
+ * Deep search to find the actual image URL from a hovered element or its wrappers
+ */
+function resolveImageFromElement(element) {
+    if (!element || element.nodeType !== 1) return null;
 
-    const element = event.target;
-    let imageUrl = null;
-
-    // 1. Standard <img> tag
-    if (element.tagName === 'IMG' && element.src) {
-        // Skip tiny icons/avatars/tracking pixels
-        const rect = element.getBoundingClientRect();
-        if (rect.width < 100 || rect.height < 100) return;
-        imageUrl = element.src;
-    }
-    // 2. CSS background-image
-    else {
-        const bgUrl = getElementBgImage(element);
-        if (bgUrl) {
+    // 1. Direct <img> tag
+    if (element.tagName === 'IMG') {
+        const src = element.currentSrc || element.src;
+        if (isValidImageSrc(src)) {
             const rect = element.getBoundingClientRect();
-            if (rect.width < 100 || rect.height < 100) return;
-            imageUrl = bgUrl;
+            if (rect.width >= 64 && rect.height >= 64) {
+                return { element, url: src };
+            }
         }
     }
 
-    if (!imageUrl) return;
+    // 2. Direct <picture> or <figure> containing <img>
+    if (element.tagName === 'PICTURE' || element.tagName === 'FIGURE') {
+        const img = element.querySelector('img');
+        if (img) {
+            const src = img.currentSrc || img.src;
+            if (isValidImageSrc(src)) {
+                const rect = element.getBoundingClientRect();
+                if (rect.width >= 64 && rect.height >= 64) {
+                    return { element, url: src };
+                }
+            }
+        }
+    }
+
+    // 3. CSS Background image on the element itself
+    const bgUrl = getElementBgImage(element);
+    if (bgUrl && isValidImageSrc(bgUrl)) {
+        const rect = element.getBoundingClientRect();
+        if (rect.width >= 64 && rect.height >= 64) {
+            return { element, url: bgUrl };
+        }
+    }
+
+    // 4. Overlays / wrappers on social media (X, Instagram, Reddit, Facebook, Pinterest)
+    // Search children first
+    const childImg = element.querySelector('img');
+    if (childImg) {
+        const src = childImg.currentSrc || childImg.src;
+        if (isValidImageSrc(src)) {
+            const rect = childImg.getBoundingClientRect();
+            if (rect.width >= 64 && rect.height >= 64) {
+                return { element: childImg, url: src };
+            }
+        }
+    }
+
+    // Search closest media container
+    const container = element.closest('a, article, figure, [role="link"], [data-testid="tweetPhoto"], [role="img"]');
+    if (container && container !== element) {
+        const containerImg = container.querySelector('img');
+        if (containerImg) {
+            const src = containerImg.currentSrc || containerImg.src;
+            if (isValidImageSrc(src)) {
+                const rect = containerImg.getBoundingClientRect();
+                if (rect.width >= 64 && rect.height >= 64) {
+                    return { element: containerImg, url: src };
+                }
+            }
+        }
+        const containerBg = getElementBgImage(container);
+        if (containerBg && isValidImageSrc(containerBg)) {
+            const rect = container.getBoundingClientRect();
+            if (rect.width >= 64 && rect.height >= 64) {
+                return { element: container, url: containerBg };
+            }
+        }
+    }
+
+    return null;
+}
+
+function isValidImageSrc(src) {
+    if (!src || typeof src !== 'string') return false;
+    if (src.startsWith('data:image/svg+xml')) return false; // Ignore SVG icons
+    return src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:image/');
+}
+
+function handleMouseOver(event) {
+    if (!isExtensionEnabled || isCurrentDomainExcluded()) return;
+
+    const resolved = resolveImageFromElement(event.target);
+    if (!resolved) return;
+
+    const { element, url } = resolved;
+    if (currentTargetUrl === url && currentTooltip) return;
 
     currentTargetElement = element;
-    currentTargetUrl = imageUrl;
+    currentTargetUrl = url;
 
     clearTimeout(hoverTimeout);
     hoverTimeout = setTimeout(() => {
-        // Check cache first
-        if (resultCache.has(imageUrl)) {
+        if (!currentTargetUrl || currentTargetUrl !== url) return;
+
+        // Check cache first for instant display, preferring a deep result if one exists
+        const deepHit = resultCache.get(cacheKeyFor(url, true));
+        const fastHit = resultCache.get(cacheKeyFor(url, false));
+        if (deepHit || fastHit) {
             showTooltip(element);
-            updateTooltip(resultCache.get(imageUrl));
+            updateTooltip(deepHit || fastHit);
             return;
         }
 
         showTooltip(element);
-        sendAnalysisRequest(imageUrl);
-    }, 280);
+        sendAnalysisRequest(url);
+    }, 250);
 }
 
-function handleMouseOut() {
+function handleMouseOut(event) {
+    // If moving to another child inside same element, don't immediately remove
+    if (event.relatedTarget && currentTargetElement && currentTargetElement.contains(event.relatedTarget)) {
+        return;
+    }
+
     clearTimeout(hoverTimeout);
     removeTooltip();
     currentTargetElement = null;
     currentTargetUrl = null;
 }
 
-function sendAnalysisRequest(imageUrl) {
+function cacheKeyFor(imageUrl, deepScan) {
+    return deepScan ? `deep:${imageUrl}` : imageUrl;
+}
+
+function sendAnalysisRequest(imageUrl, options = {}) {
+    const deepScan = !!options.deepScan;
     if (!port) connectPort();
 
     if (port) {
         try {
-            port.postMessage({ action: 'analyzeImage', imageUrl: imageUrl });
+            port.postMessage({ action: 'analyzeImage', imageUrl: imageUrl, deepScan });
             return;
         } catch (e) {
             connectPort();
@@ -130,13 +228,13 @@ function sendAnalysisRequest(imageUrl) {
     }
 
     // Fallback to one-off runtime message
-    chrome.runtime.sendMessage({ action: 'analyzeImage', imageUrl: imageUrl }, (response) => {
+    chrome.runtime.sendMessage({ action: 'analyzeImage', imageUrl: imageUrl, deepScan }, (response) => {
         if (chrome.runtime.lastError) {
             updateTooltipError("Background engine unavailable");
             return;
         }
         if (response && response.success && currentTargetUrl === imageUrl) {
-            resultCache.set(imageUrl, response.result);
+            resultCache.set(cacheKeyFor(imageUrl, deepScan), response.result);
             updateTooltip(response.result);
         } else if (response && !response.success && currentTargetUrl === imageUrl) {
             updateTooltipError(response.error);
@@ -144,11 +242,41 @@ function sendAnalysisRequest(imageUrl) {
     });
 }
 
+/**
+ * Deep scan: re-runs the hovered image at higher resolution and with true ELA, which
+ * costs a JPEG round trip and so is never done speculatively on hover.
+ */
+function requestDeepScan() {
+    if (!currentTargetUrl || !currentTooltip) return;
+
+    const cached = resultCache.get(cacheKeyFor(currentTargetUrl, true));
+    if (cached) { updateTooltip(cached); return; }
+
+    const hint = currentTooltip.querySelector('.verifeye-hint');
+    if (hint) hint.textContent = 'Deep scanning...';
+
+    sendAnalysisRequest(currentTargetUrl, { deepScan: true });
+}
+
+document.addEventListener('keydown', (event) => {
+    // Never steal the key from a field the user is typing into.
+    const target = event.target;
+    const typing = target && (target.isContentEditable ||
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+
+    if (typing || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key !== 'v' && event.key !== 'V') return;
+    if (!isExtensionEnabled || !currentTargetUrl || !currentTooltip) return;
+
+    event.preventDefault();
+    requestDeepScan();
+});
+
 function showTooltip(element) {
     removeTooltip();
 
     const tooltip = document.createElement('div');
-    tooltip.id = 'ai-detector-tooltip';
+    tooltip.id = 'verifeye-tooltip';
     tooltip.innerHTML = `
         <div class="verifeye-loading">
             <div class="verifeye-spinner"></div>
@@ -160,7 +288,6 @@ function showTooltip(element) {
     currentTooltip = tooltip;
     positionTooltip(element);
 
-    // Fade in animation
     requestAnimationFrame(() => {
         tooltip.classList.add('verifeye-visible');
     });
@@ -173,36 +300,100 @@ function updateTooltip(result) {
     const classification = result.classification || (prob >= 70 ? 'Likely AI' : prob >= 35 ? 'Uncertain' : 'Likely Real');
 
     let colorClass = 'verifeye-low';
-    if (prob >= 70) {
-        colorClass = 'verifeye-high';
-    } else if (prob >= 35) {
-        colorClass = 'verifeye-medium';
-    }
+    if (prob >= 70) colorClass = 'verifeye-high';
+    else if (prob >= 35) colorClass = 'verifeye-medium';
 
     let engineTag = 'Local';
-    if (result.engine === 'cloud_gemini' || result.engineMode === 'cloud') {
-        engineTag = 'Gemini';
-    } else if (result.engine === 'hybrid' || result.engineMode === 'hybrid') {
-        engineTag = 'Hybrid';
+    if (result.engine === 'cloud_gemini' || result.engineMode === 'cloud') engineTag = 'Gemini';
+    else if (result.engine === 'hybrid' || result.engineMode === 'hybrid') engineTag = 'Hybrid';
+    else if (result.engine === 'local_metadata') engineTag = 'Provenance';
+    if (result.deepScan) engineTag += ' · Deep';
+
+    const reasonsList = (result.reasons || []).slice(0, 2)
+        .map(r => `<li>${escapeHtml(r)}</li>`).join('');
+
+    // The band is what makes the number honest: it widens when the signals disagree
+    // or when evidence was missing, both of which a bare percentage conceals.
+    let bandHtml = '';
+    if (Array.isArray(result.band) && result.verdict !== 'AI_CONFIRMED') {
+        const [low, high] = result.band;
+        if (high - low >= 2) {
+            bandHtml = `<div class="verifeye-band">range ${low}&ndash;${high}% · agreement ${Math.round((result.agreement ?? 0) * 100)}%</div>`;
+        }
     }
 
-    const reasonsList = (result.reasons || []).slice(0, 2).map(r => `<li>${escapeHtml(r)}</li>`).join('');
+    const hintText = result.deepScan
+        ? 'Deep scan complete'
+        : 'Press V for deep scan';
 
     currentTooltip.className = `verifeye-visible ${colorClass}`;
     currentTooltip.innerHTML = `
         <div class="verifeye-header">
-            <span class="verifeye-badge">${classification} <b>${prob}%</b></span>
-            <span class="verifeye-engine-tag">${engineTag}</span>
+            <span class="verifeye-badge">${escapeHtml(classification)} <b>${prob}%</b></span>
+            <span class="verifeye-engine-tag">${escapeHtml(engineTag)}</span>
         </div>
         <div class="verifeye-bar-container">
             <div class="verifeye-bar" style="width: ${prob}%;"></div>
         </div>
+        ${bandHtml}
         ${reasonsList ? `<ul class="verifeye-reasons">${reasonsList}</ul>` : ''}
+        <div class="verifeye-spectrum-slot"></div>
+        <div class="verifeye-hint">${escapeHtml(hintText)}</div>
     `;
 
-    if (currentTargetElement) {
-        positionTooltip(currentTargetElement);
+    renderTooltipSpectrum(result);
+
+    if (currentTargetElement) positionTooltip(currentTargetElement);
+}
+
+/**
+ * Paint the measured FFT magnitude into the tooltip. Deep scans only: the spectrum
+ * is real data from the engine, not an illustration, so there is nothing to show
+ * until the scan that computes it has run.
+ */
+function renderTooltipSpectrum(result) {
+    const slot = currentTooltip && currentTooltip.querySelector('.verifeye-spectrum-slot');
+    const spectrum = result.signals && result.signals.fft && result.signals.fft.spectrum;
+    if (!slot || !spectrum || !spectrum.base64) return;
+
+    let bytes;
+    try {
+        const binary = atob(spectrum.base64);
+        bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    } catch (e) {
+        return;
     }
+
+    const size = spectrum.size;
+    if (bytes.length !== size * size) return;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    canvas.className = 'verifeye-spectrum';
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const img = ctx.createImageData(size, size);
+    for (let i = 0; i < size * size; i++) {
+        const v = bytes[i] / 255;
+        const o = i * 4;
+        img.data[o] = Math.round(255 * Math.pow(v, 2.4));
+        img.data[o + 1] = Math.round(255 * Math.pow(v, 1.15));
+        img.data[o + 2] = Math.round(255 * Math.pow(v, 0.65));
+        img.data[o + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+
+    slot.appendChild(canvas);
+
+    const fft = result.signals.fft;
+    const caption = document.createElement('div');
+    caption.className = 'verifeye-spectrum-caption';
+    caption.textContent = `${fft.peakCount} harmonics · slope ${fft.slope}`;
+    slot.appendChild(caption);
 }
 
 function updateTooltipError(errorText) {
@@ -232,13 +423,13 @@ function positionTooltip(element) {
     const rect = element.getBoundingClientRect();
     const tooltipRect = currentTooltip.getBoundingClientRect();
 
-    const padding = 8;
+    const padding = 10;
     let top = rect.top + 10;
     let left = rect.left + 10;
 
     // Viewport boundary clamping
-    const maxTop = window.innerHeight - (tooltipRect.height || 70) - padding;
-    const maxLeft = window.innerWidth - (tooltipRect.width || 220) - padding;
+    const maxTop = window.innerHeight - (tooltipRect.height || 80) - padding;
+    const maxLeft = window.innerWidth - (tooltipRect.width || 240) - padding;
 
     top = Math.max(padding, Math.min(top, maxTop));
     left = Math.max(padding, Math.min(left, maxLeft));
@@ -248,29 +439,22 @@ function positionTooltip(element) {
 }
 
 function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
 }
 
-// Global Event Listeners with MutationObserver for dynamic websites
-const observer = new MutationObserver((mutationsList) => {
-    for (const mutation of mutationsList) {
-        if (mutation.type === 'childList') {
-            mutation.addedNodes.forEach(node => {
-                if (node.nodeType === 1) {
-                    node.addEventListener('mouseover', handleMouseOver);
-                    node.addEventListener('mouseout', handleMouseOut);
-                }
-            });
-        }
+// Reposition on scroll
+window.addEventListener('scroll', () => {
+    if (currentTooltip && currentTargetElement) {
+        positionTooltip(currentTargetElement);
     }
-});
+}, { passive: true });
 
-observer.observe(document.body, { childList: true, subtree: true });
-
-document.addEventListener('mouseover', handleMouseOver);
-document.addEventListener('mouseout', handleMouseOut);
+// Two delegated listeners on document cover the entire page, including nodes added
+// later by infinite scroll -- mouseover/mouseout both bubble. An earlier version also
+// attached a pair of handlers to every node a MutationObserver saw, which on a feed
+// accumulated thousands of redundant listeners that were never removed.
+document.addEventListener('mouseover', handleMouseOver, { passive: true });
+document.addEventListener('mouseout', handleMouseOut, { passive: true });

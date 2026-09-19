@@ -1,0 +1,13 @@
+node_modules/
+
+# Calibration corpora are collected from someone's own labelled images. The export
+# holds only numeric signal scores, never pixels, but it is still local evidence
+# about a private image set and belongs to whoever collected it.
+bench/corpus*.json
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/

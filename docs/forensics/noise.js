@@ -12,7 +12,9 @@ export function analyzeNoise(imageData) {
             score: 50,
             syntheticSmoothness: false,
             kurtosis: 3.0,
-            details: ['Image too small for noise residual evaluation']
+            smoothRatio: 0,
+            variance: 0,
+            details: ['Image dimensions too small for noise residual evaluation']
         };
     }
 
@@ -45,11 +47,10 @@ export function analyzeNoise(imageData) {
         }
     }
 
-    if (count === 0) return { score: 50, syntheticSmoothness: false, details: [] };
+    if (count === 0) return { score: 50, syntheticSmoothness: false, kurtosis: 3.0, smoothRatio: 0, variance: 0, details: [] };
 
     const mean = residualSum / count;
     const variance = (residualSumSq / count) - (mean * mean);
-    const stdDev = Math.sqrt(Math.max(1e-6, variance));
 
     // Calculate Kurtosis (Gaussian noise = 3.0; Diffusion / Generative images diverge strongly)
     let sumFourth = 0;
@@ -60,7 +61,8 @@ export function analyzeNoise(imageData) {
             sumFourth += diff * diff * diff * diff;
         }
     }
-    const kurtosis = sumFourth / (count * variance * variance + 1e-6);
+    const denom = count * variance * variance;
+    const kurtosis = denom > 1e-6 ? (sumFourth / denom) : 0;
 
     // Patch-based local noise variance analysis (detects localized synthetic smoothing in skin/sky)
     const patchSize = 16;
@@ -95,7 +97,7 @@ export function analyzeNoise(imageData) {
                 const pVar = (pSumSq / pCount) - (pMean * pMean);
                 totalPatches++;
 
-                // A very low variance patch indicates unnatural synthetic smoothing (plastic skin, clean diffusion gradients)
+                // Low variance patch indicates unnatural synthetic smoothing (plastic skin, clean diffusion gradients)
                 if (pVar < 1.2) {
                     ultraSmoothCount++;
                 }
@@ -114,7 +116,7 @@ export function analyzeNoise(imageData) {
     if (kurtosis > 8.0) {
         noiseScore += 35;
         details.push(`Synthetic noise distribution (Kurtosis: ${kurtosis.toFixed(1)}, non-Gaussian)`);
-    } else if (kurtosis < 1.8) {
+    } else if (kurtosis < 1.8 || variance < 0.05) {
         noiseScore += 25;
         details.push(`Artificially uniform / quantized noise residual (Kurtosis: ${kurtosis.toFixed(1)})`);
     }
@@ -122,13 +124,13 @@ export function analyzeNoise(imageData) {
     // 2. Evaluate Plastic / Diffusion Oversmoothing
     if (smoothRatio > 0.40) {
         noiseScore += 35;
-        details.push(`High level of unnatural texture smoothing (${Math.round(smoothRatio * 100)}% ultra-smooth patches)`);
+        details.push(`Synthetic diffusion smoothing (${Math.round(smoothRatio * 100)}% ultra-smooth patches)`);
     } else if (smoothRatio > 0.20) {
         noiseScore += 18;
         details.push(`Moderate surface smoothing typical of AI generation`);
     }
 
-    // Natural camera grain sanity check
+    // Natural camera sensor noise grain sanity check
     if (kurtosis >= 2.4 && kurtosis <= 4.2 && smoothRatio < 0.12 && variance > 12) {
         noiseScore = Math.max(8, noiseScore - 20);
         details.push('Natural camera sensor noise grain detected');
@@ -139,9 +141,9 @@ export function analyzeNoise(imageData) {
     return {
         score: noiseScore,
         syntheticSmoothness: smoothRatio > 0.25,
-        kurtosis: kurtosis,
-        smoothRatio: smoothRatio,
-        variance: variance,
+        kurtosis: Number(kurtosis.toFixed(2)),
+        smoothRatio: Number(smoothRatio.toFixed(3)),
+        variance: Number(variance.toFixed(2)),
         details: details
     };
 }

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VerifEye | Open-Source Client-Side AI Image Forensics</title>
-    <meta name="description" content="Sub-20ms in-browser synthetic image forensics powered by 2D Fast Fourier Transform frequency decomposition, sensor noise kurtosis, and binary provenance parsing.">
+    <meta name="description" content="Open-source in-browser image forensics: 2D FFT harmonics, sensor noise kurtosis, Bayer demosaicing traces, true error level analysis and binary provenance parsing, fused in log-odds with reported uncertainty.">
     <link rel="icon" type="image/png" href="assets/icon16.png">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -28,7 +28,7 @@
                 <li><a href="#quickstart">Quickstart</a></li>
             </ul>
             <div class="nav-actions">
-                <a href="https://github.com/zihaaaad/VerifEye-AI-Image-Detector" target="_blank" class="btn btn-secondary">
+                <a href="https://github.com/zihaaaad/VerifEye" target="_blank" class="btn btn-secondary">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                     GitHub
                 </a>
@@ -51,7 +51,7 @@
             </h1>
 
             <p class="hero-subtitle">
-                Distinguish physical camera captures from Stable Diffusion, Midjourney, DALL-E, and Flux in under 20 milliseconds. Powered by 2D Fourier decomposition, sensor noise kurtosis, and binary provenance parsing.
+                Eight independent forensic signals &mdash; Fourier harmonics, sensor noise kurtosis, Bayer demosaicing traces, recompression error levels and binary provenance &mdash; fused in log-odds and reported with the uncertainty they actually carry. Every measurement on this page runs in your browser.
             </p>
 
             <div class="hero-actions">
@@ -61,16 +61,23 @@
 
             <!-- Interactive Forensic Workbench -->
             <div class="workbench" id="workbench">
+                <p class="workbench-note">
+                    These samples are photographs, labelled as photographs. The engine reports what it
+                    measures on whatever you give it &mdash; to test synthetic detection properly, drop in
+                    an image you generated yourself.
+                </p>
+
                 <div class="workbench-toolbar">
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span class="tag tag-cyan">Live Studio</span>
                         <span style="font-size: 0.78rem; font-family: var(--font-mono); color: var(--text-muted);">Client-Side Forensic Pipeline</span>
                     </div>
                     <div class="workbench-controls">
-                        <button class="sample-btn active" data-sample="sdxl">Stable Diffusion XL</button>
-                        <button class="sample-btn" data-sample="dslr">DSLR Camera (50mm)</button>
-                        <button class="sample-btn" data-sample="midjourney">Midjourney v6</button>
-                        <button class="sample-btn" data-sample="custom" style="border-color: var(--cyan-500); color: var(--cyan-500);">Drop Local Image</button>
+                        <button class="sample-btn active" data-sample="portrait">Portrait (DSLR)</button>
+                        <button class="sample-btn" data-sample="landscape">Landscape (DSLR)</button>
+                        <button class="sample-btn" data-sample="macro">Macro / Studio</button>
+                        <button class="sample-btn" data-sample="render">Synthetic Render</button>
+                        <button class="sample-btn" data-sample="custom" style="border-color: var(--cyan-500); color: var(--cyan-500);">Drop Your Own Image</button>
                         <input type="file" id="fileInput" accept="image/*" style="display: none;">
                     </div>
                 </div>
@@ -96,11 +103,14 @@
                     <div class="telemetry-pane">
                         <div class="verdict-banner">
                             <div>
-                                <div class="verdict-label">Calculated Verdict</div>
-                                <div id="verdictScore" class="verdict-score" style="color: var(--crimson-500); margin-top: 4px;">--%</div>
+                                <div class="verdict-label">Fused Verdict</div>
+                                <div id="verdictScore" class="verdict-score" style="margin-top: 4px;">--%</div>
                             </div>
-                            <div id="verdictTag" class="tag tag-crimson">Analyzing</div>
+                            <div id="verdictTag" class="tag tag-cyan">Analyzing</div>
                         </div>
+
+                        <div id="verdictBand" class="verdict-band">Running eight signals locally&hellip;</div>
+                        <div id="verdictMeta" class="verdict-meta"></div>
 
                         <div class="signal-matrix">
                             <div class="signal-item">
@@ -142,14 +152,47 @@
                                 </div>
                                 <span id="readingColor" class="signal-reading">--</span>
                             </div>
+
+                            <div class="signal-item">
+                                <div class="signal-meta">
+                                    <span class="signal-name">CFA Demosaicing Lattice</span>
+                                    <span class="signal-desc">Bayer parity variance, native crop only</span>
+                                </div>
+                                <span id="readingCfa" class="signal-reading">--</span>
+                            </div>
+
+                            <div class="signal-item">
+                                <div class="signal-meta">
+                                    <span class="signal-name">Encoder Fingerprint</span>
+                                    <span class="signal-desc">JPEG DQT table vs IJG Annex K</span>
+                                </div>
+                                <span id="readingQuant" class="signal-reading">--</span>
+                            </div>
+
+                            <div class="signal-item is-diagnostic">
+                                <div class="signal-meta">
+                                    <span class="signal-name">DCT First-Digit Law</span>
+                                    <span class="signal-desc">Diagnostic only &mdash; excluded from the verdict</span>
+                                </div>
+                                <span id="readingBenford" class="signal-reading">--</span>
+                            </div>
+                        </div>
+
+                        <div class="contrib-box">
+                            <div class="spectrum-header">
+                                <span>Evidence contribution (log-odds)</span>
+                                <span class="tag tag-cyan" style="font-size: 0.65rem; padding: 1px 4px;">Fusion</span>
+                            </div>
+                            <ul id="contributionList" class="contrib-list"></ul>
                         </div>
 
                         <div class="spectrum-box">
                             <div class="spectrum-header">
-                                <span>2D Fast Fourier Transform Magnitude |F(u,v)|²</span>
+                                <span>Measured 2D FFT magnitude |F(u,v)|</span>
                                 <span class="tag tag-cyan" style="font-size: 0.65rem; padding: 1px 4px;">Shifted DC</span>
                             </div>
-                            <canvas id="fftCanvas" width="280" height="140"></canvas>
+                            <canvas id="fftCanvas" width="280" height="200"></canvas>
+                            <div id="spectrumCaption" class="spectrum-caption">Awaiting analysis</div>
                         </div>
                     </div>
                 </div>
@@ -295,8 +338,8 @@
                     <span style="font-size: 0.72rem; color: var(--text-muted);">Terminal / PowerShell</span>
                 </div>
                 <div class="terminal-body">
-                    <div><span class="prompt">$ </span>git clone https://github.com/zihaaaad/VerifEye-AI-Image-Detector.git</div>
-                    <div><span class="prompt">$ </span>cd VerifEye-AI-Image-Detector</div>
+                    <div><span class="prompt">$ </span>git clone https://github.com/zihaaaad/VerifEye.git</div>
+                    <div><span class="prompt">$ </span>cd VerifEye</div>
                 </div>
             </div>
 
@@ -318,7 +361,7 @@
                 <span style="color: var(--text-primary); font-weight: 600;">VerifEye</span> — Open-Source Client-Side AI Image Forensics.
             </div>
             <div>
-                Published under the <a href="https://github.com/zihaaaad/VerifEye-AI-Image-Detector/blob/main/LICENSE" target="_blank" style="color: var(--cyan-500); text-decoration: none;">MIT License</a>.
+                Published under the <a href="https://github.com/zihaaaad/VerifEye/blob/main/LICENSE" target="_blank" style="color: var(--cyan-500); text-decoration: none;">MIT License</a>.
             </div>
         </div>
     </footer>

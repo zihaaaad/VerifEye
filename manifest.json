@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "VerifEye: AI Image Detector",
-  "version": "2.0.0",
-  "description": "Real-time, local-first AI image detection on hover. Powered by open-source frequency, noise, and metadata forensic algorithms.",
+  "name": "VerifEye",
+  "version": "2.1.0",
+  "description": "Local-first AI image forensics on hover. Eight signals - FFT harmonics, sensor noise, CFA lattice, error level analysis, provenance - fused with reported uncertainty.",
   "permissions": [
     "storage",
     "scripting",
     "tabs",
-    "action"
+    "action",
+    "contextMenus"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -18,12 +19,26 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["content.css"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ]
     }
   ],
-  "action": {},
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "VerifEye - Image Forensics",
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "48": "assets/icon48.png",
+      "128": "assets/icon128.png"
+    }
+  },
   "options_page": "settings/settings.html",
   "icons": {
     "16": "assets/icon16.png",
