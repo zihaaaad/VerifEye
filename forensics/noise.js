@@ -12,7 +12,9 @@ export function analyzeNoise(imageData) {
             score: 50,
             syntheticSmoothness: false,
             kurtosis: 3.0,
-            details: ['Image too small for noise residual evaluation']
+            smoothRatio: 0,
+            variance: 0,
+            details: ['Image dimensions too small for noise residual evaluation']
         };
     }
 
@@ -45,22 +47,57 @@ export function analyzeNoise(imageData) {
         }
     }
 
-    if (count === 0) return { score: 50, syntheticSmoothness: false, details: [] };
+    if (count === 0) return { score: 50, syntheticSmoothness: false, kurtosis: 3.0, smoothRatio: 0, variance: 0, details: [] };
 
     const mean = residualSum / count;
     const variance = (residualSumSq / count) - (mean * mean);
-    const stdDev = Math.sqrt(Math.max(1e-6, variance));
 
-    // Calculate Kurtosis (Gaussian noise = 3.0; Diffusion / Generative images diverge strongly)
+    // Kurtosis of the residual, measured over FLAT REGIONS ONLY.
+    //
+    // The Gaussian reference value of 3.0 holds for sensor noise. It does not hold for
+    // the Laplacian of a whole photograph, which is dominated by edges and is therefore
+    // strongly heavy-tailed: a real Sony frame measured 96 here, far past the > 8.0
+    // "synthetic" threshold, because the image had sharp specular highlights. Measuring
+    // over the whole frame was really measuring how much edge structure the scene had.
+    //
+    // Restricting to low-gradient patches isolates the part of the residual that is
+    // actually sensor noise, which is the quantity the 3.0 reference describes.
+    const flatThreshold = estimateFlatThreshold(residual, width, height);
+
     let sumFourth = 0;
+    let flatSum = 0;
+    let flatSumSq = 0;
+    let flatCount = 0;
+
     for (let y = 1; y < height - 1; y++) {
         const row = y * width;
         for (let x = 1; x < width - 1; x++) {
-            const diff = residual[row + x] - mean;
-            sumFourth += diff * diff * diff * diff;
+            const v = residual[row + x];
+            if (Math.abs(v) > flatThreshold) continue;   // edge pixel, not noise
+            flatSum += v;
+            flatSumSq += v * v;
+            flatCount++;
         }
     }
-    const kurtosis = sumFourth / (count * variance * variance + 1e-6);
+
+    let kurtosis = 3.0;
+    if (flatCount > 256) {
+        const flatMean = flatSum / flatCount;
+        const flatVariance = (flatSumSq / flatCount) - flatMean * flatMean;
+
+        if (flatVariance > 1e-6) {
+            for (let y = 1; y < height - 1; y++) {
+                const row = y * width;
+                for (let x = 1; x < width - 1; x++) {
+                    const v = residual[row + x];
+                    if (Math.abs(v) > flatThreshold) continue;
+                    const diff = v - flatMean;
+                    sumFourth += diff * diff * diff * diff;
+                }
+            }
+            kurtosis = sumFourth / (flatCount * flatVariance * flatVariance);
+        }
+    }
 
     // Patch-based local noise variance analysis (detects localized synthetic smoothing in skin/sky)
     const patchSize = 16;
@@ -95,7 +132,7 @@ export function analyzeNoise(imageData) {
                 const pVar = (pSumSq / pCount) - (pMean * pMean);
                 totalPatches++;
 
-                // A very low variance patch indicates unnatural synthetic smoothing (plastic skin, clean diffusion gradients)
+                // Low variance patch indicates unnatural synthetic smoothing (plastic skin, clean diffusion gradients)
                 if (pVar < 1.2) {
                     ultraSmoothCount++;
                 }
@@ -114,7 +151,7 @@ export function analyzeNoise(imageData) {
     if (kurtosis > 8.0) {
         noiseScore += 35;
         details.push(`Synthetic noise distribution (Kurtosis: ${kurtosis.toFixed(1)}, non-Gaussian)`);
-    } else if (kurtosis < 1.8) {
+    } else if (kurtosis < 1.8 || variance < 0.05) {
         noiseScore += 25;
         details.push(`Artificially uniform / quantized noise residual (Kurtosis: ${kurtosis.toFixed(1)})`);
     }
@@ -122,13 +159,13 @@ export function analyzeNoise(imageData) {
     // 2. Evaluate Plastic / Diffusion Oversmoothing
     if (smoothRatio > 0.40) {
         noiseScore += 35;
-        details.push(`High level of unnatural texture smoothing (${Math.round(smoothRatio * 100)}% ultra-smooth patches)`);
+        details.push(`Synthetic diffusion smoothing (${Math.round(smoothRatio * 100)}% ultra-smooth patches)`);
     } else if (smoothRatio > 0.20) {
         noiseScore += 18;
         details.push(`Moderate surface smoothing typical of AI generation`);
     }
 
-    // Natural camera grain sanity check
+    // Natural camera sensor noise grain sanity check
     if (kurtosis >= 2.4 && kurtosis <= 4.2 && smoothRatio < 0.12 && variance > 12) {
         noiseScore = Math.max(8, noiseScore - 20);
         details.push('Natural camera sensor noise grain detected');
@@ -139,9 +176,37 @@ export function analyzeNoise(imageData) {
     return {
         score: noiseScore,
         syntheticSmoothness: smoothRatio > 0.25,
-        kurtosis: kurtosis,
-        smoothRatio: smoothRatio,
-        variance: variance,
+        kurtosis: Number(kurtosis.toFixed(2)),
+        smoothRatio: Number(smoothRatio.toFixed(3)),
+        variance: Number(variance.toFixed(2)),
         details: details
     };
+}
+
+/**
+ * Robust scale estimate for the residual, used to separate flat regions from edges.
+ *
+ * Uses a median-absolute-deviation style cut rather than a standard deviation, because
+ * the edges we are trying to exclude would otherwise inflate the very threshold meant
+ * to exclude them. Sampled on a stride: this only needs to be approximately right.
+ */
+function estimateFlatThreshold(residual, width, height) {
+    const samples = [];
+    const stride = Math.max(1, Math.floor(Math.sqrt((width * height) / 4096)));
+
+    for (let y = 1; y < height - 1; y += stride) {
+        const row = y * width;
+        for (let x = 1; x < width - 1; x += stride) {
+            samples.push(Math.abs(residual[row + x]));
+        }
+    }
+
+    if (samples.length < 32) return Infinity;
+
+    samples.sort((a, b) => a - b);
+    const median = samples[samples.length >> 1];
+
+    // Keep roughly the calmest two thirds of the frame; 3x the median absolute
+    // residual is comfortably above the noise floor and below real edge energy.
+    return Math.max(1.5, median * 3);
 }

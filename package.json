@@ -1,0 +1,36 @@
+{
+  "name": "verifeye",
+  "version": "2.1.0",
+  "description": "Local-first Chrome extension and forensic engine that scores images for synthetic origin using FFT harmonics, sensor noise, CFA demosaicing traces, true error level analysis and binary provenance, fused in log-odds with reported uncertainty.",
+  "type": "module",
+  "main": "background.js",
+  "scripts": {
+    "test": "node tools/sync-forensics.mjs --check && node test/forensics.test.js",
+    "sync": "node tools/sync-forensics.mjs",
+    "sync:check": "node tools/sync-forensics.mjs --check",
+    "bench": "node bench/benchmark.mjs",
+    "bench:write": "node bench/benchmark.mjs --write",
+    "calibrate": "node bench/calibrate.mjs"
+  },
+  "keywords": [
+    "ai-detector",
+    "image-forensics",
+    "chrome-extension",
+    "fast-fourier-transform",
+    "noise-analysis",
+    "c2pa",
+    "stable-diffusion",
+    "midjourney",
+    "flux",
+    "dall-e",
+    "error-level-analysis",
+    "cfa-demosaicing",
+    "prnu"
+  ],
+  "author": "Zihad Hasan",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zihaaaad/VerifEye.git"
+  }
+}

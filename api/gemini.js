@@ -17,7 +17,7 @@ Respond strictly in JSON format with two keys:
 Example: {"probability": 85, "reasons": ["Unnatural hand anatomy", "Diffusion texture smoothing"]}`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10-second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 12000); // 12-second timeout
 
     try {
         const response = await fetch(API_URL, {
@@ -78,6 +78,43 @@ Example: {"probability": 85, "reasons": ["Unnatural hand anatomy", "Diffusion te
                 engine: 'cloud_gemini'
             };
         }
+    } catch (err) {
+        clearTimeout(timeoutId);
+        throw err;
+    }
+}
+
+/**
+ * Quick validation helper to test an API key without large payload
+ */
+export async function testGeminiApiKey(apiKey, modelName = 'gemini-1.5-flash') {
+    if (!apiKey) throw new Error("API key cannot be empty");
+
+    const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            signal: controller.signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                "contents": [{
+                    "parts": [{ "text": "Ping" }]
+                }],
+                "generationConfig": { "maxOutputTokens": 2 }
+            })
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `API error (${response.status})`);
+        }
+
+        return { success: true };
     } catch (err) {
         clearTimeout(timeoutId);
         throw err;
