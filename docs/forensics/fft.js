@@ -94,8 +94,19 @@ function computeTileFFT(data, fullWidth, startX, startY, N, includeSpectrum = fa
     // 2D FFT: 1D FFT on rows, then 1D FFT on columns
     fft2d(real, imag, N);
 
-    // Compute shifted power spectrum magnitude
+    // Two representations of the same spectrum, because they are used for different
+    // things and conflating them is a real bug:
+    //
+    //   magnitude - log(1+|F|), compressed for display and for peak detection, where
+    //               only the ratio to the local neighbourhood matters.
+    //   linearMag - raw |F|, used for the radial profile. The power-law fit already
+    //               takes a logarithm, so feeding it the log-magnitude would be
+    //               fitting log(log(|F|)) against log(r). That flattens every
+    //               spectrum to a slope near -0.1 and made the "unnatural flat
+    //               decay" rule fire on natural photographs and synthetic images
+    //               alike.
     const magnitude = new Float32Array(N * N);
+    const linearMag = new Float32Array(N * N);
     const halfN = N / 2;
 
     for (let y = 0; y < N; y++) {
@@ -108,7 +119,10 @@ function computeTileFFT(data, fullWidth, startX, startY, N, includeSpectrum = fa
 
             const re = real[idx];
             const im = imag[idx];
-            magnitude[shiftedIdx] = Math.log(1 + Math.sqrt(re * re + im * im));
+            const abs = Math.sqrt(re * re + im * im);
+
+            linearMag[shiftedIdx] = abs;
+            magnitude[shiftedIdx] = Math.log(1 + abs);
         }
     }
 
@@ -132,7 +146,7 @@ function computeTileFFT(data, fullWidth, startX, startY, N, includeSpectrum = fa
 
             if (r > 0 && r < maxRadius) {
                 const val = magnitude[y * N + x];
-                radialSum[r] += val;
+                radialSum[r] += linearMag[y * N + x];
                 radialCount[r]++;
 
                 if (r >= midRadiusStart && r < highRadiusStart) {
@@ -192,19 +206,38 @@ function computeTileFFT(data, fullWidth, startX, startY, N, includeSpectrum = fa
         details.push(`Minor spectral grid resonance (${highFreqPeaks} harmonic spikes)`);
     }
 
-    // 2. Power law slope anomaly (AI models often have flatter decay or abrupt high-freq roll-off)
-    if (slope > -1.1) {
-        spectralScore += 25;
-        details.push(`Unnatural flat spectral decay (slope: ${slope.toFixed(2)}, expected ~ -2.0)`);
-    } else if (slope < -3.2) {
-        spectralScore += 20;
-        details.push(`Abrupt high-frequency attenuation from neural decoder`);
-    }
+    // 2 & 3. Radial slope and high-to-mid energy ratio: MEASURED AND REPORTED, NOT SCORED.
+    //
+    // Both were absolute thresholds, and both failed against the reference set:
+    //
+    //   - The slope threshold (> -1.1) fired on natural 1/f surfaces AND on a 2x
+    //     nearest-neighbour upsampled image, so it separated nothing. Its measured
+    //     value also depends heavily on the sensor noise floor, which flattens the
+    //     high-frequency end of any real photograph.
+    //   - The HF/MF threshold (> 1.4) fired on 100% of references, natural and
+    //     synthetic, measuring 2.4-3.0 throughout. Worse, it read LOWER on the
+    //     upsampled synthetic than on natural content, so where it discriminated at
+    //     all it pointed the wrong way.
+    //
+    // Together they were adding +45 to the highest-weighted signal in the engine for
+    // essentially every image, which is what made the studio call a Sony photograph
+    // "Likely AI" on page load.
+    //
+    // The peak count above stays, because it is a different kind of test: it compares
+    // each bin against its own local neighbourhood rather than against a constant, so
+    // it calibrates itself to the image. It is also the rule that directly detects the
+    // artifact this analyzer exists for.
+    //
+    // These two stay in the returned object for display and for `npm run calibrate` to
+    // fit thresholds against a real corpus.
 
-    // 3. High-to-Mid frequency energy ratio
-    if (hfToMfRatio > 1.4) {
+    // 4. Abrupt high-frequency cliff. Kept because it is a qualitative shape, not a
+    //    tuned cut: a decoder that discards the top octave outright is not something a
+    //    lens and sensor produce. The bound is deliberately far outside the natural
+    //    range measured on the references (-0.26 to -1.51).
+    if (slope < -4.0) {
         spectralScore += 20;
-        details.push(`Elevated high-frequency energy ratio (${hfToMfRatio.toFixed(2)})`);
+        details.push(`Abrupt high-frequency attenuation (slope ${slope.toFixed(2)})`);
     }
 
     spectralScore = Math.min(98, Math.max(5, Math.round(spectralScore)));

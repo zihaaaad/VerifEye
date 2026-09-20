@@ -1,7 +1,7 @@
 /**
  * VerifEye Studio - Forensic Engine Controller
  *
- * Drives the interactive workbench. Every number and every pixel of the spectrum on
+ * Drives the interactive studio. Every number and every pixel of the spectrum on
  * this page comes from the same modules the extension ships; nothing here is staged
  * or approximated for presentation.
  *
@@ -57,14 +57,6 @@ const SIGNAL_ROWS = [
 ];
 
 document.addEventListener('DOMContentLoaded', () => {
-    const spotlight = document.getElementById('spotlight');
-    if (spotlight) {
-        window.addEventListener('mousemove', (e) => {
-            spotlight.style.setProperty('--mouse-x', `${e.clientX}px`);
-            spotlight.style.setProperty('--mouse-y', `${e.clientY}px`);
-        }, { passive: true });
-    }
-
     const stageImage = document.getElementById('stageImage');
     const imageStage = document.getElementById('imageStage');
     const dropOverlay = document.getElementById('dropOverlay');
@@ -186,7 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function setBusy() {
         imageStage.classList.add('is-scanning');
         verdictScore.textContent = '··%';
-        verdictTag.className = 'tag tag-cyan';
+        verdictScore.style.color = '';
+        verdictTag.className = 'pill';
         verdictTag.textContent = 'Analyzing';
         if (verdictBand) verdictBand.textContent = 'Running eight signals locally…';
         SIGNAL_ROWS.forEach(row => {
@@ -198,7 +191,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderError(message) {
         imageStage.classList.remove('is-scanning');
         verdictScore.textContent = '--%';
-        verdictTag.className = 'tag tag-amber';
+        verdictScore.style.color = '';
+        verdictTag.className = 'pill tone-warn';
         verdictTag.textContent = 'Unavailable';
         if (verdictBand) verdictBand.textContent = message;
     }
@@ -210,12 +204,12 @@ document.addEventListener('DOMContentLoaded', () => {
         verdictScore.textContent = `${probability}%`;
 
         let tone;
-        if (probability >= 70) { tone = 'crimson'; verdictTag.textContent = 'Likely AI'; }
-        else if (probability >= 35) { tone = 'amber'; verdictTag.textContent = 'Uncertain'; }
-        else { tone = 'emerald'; verdictTag.textContent = 'Likely Real'; }
+        if (probability >= 70) { tone = 'bad'; verdictTag.textContent = 'Likely AI'; }
+        else if (probability >= 35) { tone = 'warn'; verdictTag.textContent = 'Uncertain'; }
+        else { tone = 'good'; verdictTag.textContent = 'Likely Real'; }
 
-        verdictScore.style.color = `var(--${tone}-500)`;
-        verdictTag.className = `tag tag-${tone}`;
+        verdictScore.style.color = `var(--${tone})`;
+        verdictTag.className = `pill tone-${tone}`;
 
         // The band is the honest part of the verdict: it widens when signals disagree
         // or when evidence was unavailable, which a bare percentage hides completely.
@@ -242,19 +236,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!el) return;
 
             const signal = result.signals?.[row.key];
-            if (!signal) { el.textContent = 'Not run'; el.style.color = 'var(--text-muted)'; return; }
+            if (!signal) { el.textContent = 'Not run'; el.style.color = 'var(--text-faint)'; return; }
 
             try { el.textContent = row.format(signal); }
             catch { el.textContent = '--'; }
 
             if (row.key === 'benford') {
-                el.style.color = 'var(--text-muted)';
+                el.style.color = '';
             } else if (typeof signal.score === 'number' && signal.informative !== false) {
-                el.style.color = signal.score >= 70 ? 'var(--crimson-500)'
-                    : signal.score <= 35 ? 'var(--emerald-500)'
-                    : 'var(--amber-500)';
+                el.style.color = signal.score >= 70 ? 'var(--bad)'
+                    : signal.score <= 35 ? 'var(--good)'
+                    : 'var(--warn)';
             } else {
-                el.style.color = 'var(--text-muted)';
+                el.style.color = 'var(--text-faint)';
             }
         });
 
@@ -309,12 +303,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const width = fftCanvas.width;
         const height = fftCanvas.height;
 
-        fftCtx.fillStyle = '#020305';
+        fftCtx.fillStyle = '#0b0b0e';
         fftCtx.fillRect(0, 0, width, height);
 
         if (!spectrum) {
             fftCtx.font = '11px ui-monospace, monospace';
-            fftCtx.fillStyle = '#64748B';
+            fftCtx.fillStyle = '#7c7a74';
             fftCtx.fillText('Spectrum unavailable (image below 128×128)', 12, height / 2);
             if (spectrumCaption) spectrumCaption.textContent = 'No spectrum';
             return;

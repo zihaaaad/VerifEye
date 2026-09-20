@@ -14,32 +14,32 @@ labelled corpus, see `bench/calibrate.mjs`.
 
 | Input size | Median | p95 |
 | --- | --- | --- |
-| 256x256 | 6.4 ms | 7.1 ms |
-| 384x384 (hover default) | 8.3 ms | 8.5 ms |
-| 768x768 (deep scan) | 19.3 ms | 19.7 ms |
+| 256x256 | 7.3 ms | 7.6 ms |
+| 384x384 (hover default) | 9.2 ms | 9.6 ms |
+| 768x768 (deep scan) | 21.1 ms | 21.5 ms |
 
 ## Per signal
 
 | Input size | Signal | Median | p95 |
 | --- | --- | --- | --- |
-| 256x256 | fft | 2.9 ms | 3.3 ms |
-| 256x256 | noise | 0.49 ms | 0.84 ms |
-| 256x256 | ela (blocking-index fallback) | 0.43 ms | 0.85 ms |
-| 256x256 | color | 0.38 ms | 1.9 ms |
-| 256x256 | cfa | 0.72 ms | 0.94 ms |
+| 256x256 | fft | 3.0 ms | 3.6 ms |
+| 256x256 | noise | 1.1 ms | 1.9 ms |
+| 256x256 | ela (blocking-index fallback) | 0.44 ms | 0.94 ms |
+| 256x256 | color | 0.33 ms | 2.0 ms |
+| 256x256 | cfa | 0.68 ms | 0.88 ms |
 | 256x256 | benford (diagnostic) | 1.9 ms | 2.0 ms |
-| 384x384 (hover default) | fft | 2.9 ms | 2.9 ms |
-| 384x384 (hover default) | noise | 1.0 ms | 1.1 ms |
-| 384x384 (hover default) | ela (blocking-index fallback) | 0.97 ms | 2.1 ms |
+| 384x384 (hover default) | fft | 3.0 ms | 3.2 ms |
+| 384x384 (hover default) | noise | 1.7 ms | 1.9 ms |
+| 384x384 (hover default) | ela (blocking-index fallback) | 0.97 ms | 2.0 ms |
 | 384x384 (hover default) | color | 0.79 ms | 0.82 ms |
-| 384x384 (hover default) | cfa | 0.49 ms | 0.60 ms |
-| 384x384 (hover default) | benford (diagnostic) | 2.0 ms | 2.1 ms |
-| 768x768 (deep scan) | fft | 2.9 ms | 2.9 ms |
-| 768x768 (deep scan) | noise | 3.9 ms | 5.6 ms |
-| 768x768 (deep scan) | ela (blocking-index fallback) | 3.9 ms | 3.9 ms |
+| 384x384 (hover default) | cfa | 0.49 ms | 0.50 ms |
+| 384x384 (hover default) | benford (diagnostic) | 2.1 ms | 2.2 ms |
+| 768x768 (deep scan) | fft | 2.9 ms | 3.1 ms |
+| 768x768 (deep scan) | noise | 5.6 ms | 6.4 ms |
+| 768x768 (deep scan) | ela (blocking-index fallback) | 3.9 ms | 4.0 ms |
 | 768x768 (deep scan) | color | 3.2 ms | 3.2 ms |
 | 768x768 (deep scan) | cfa | 2.0 ms | 2.0 ms |
-| 768x768 (deep scan) | benford (diagnostic) | 3.3 ms | 3.4 ms |
+| 768x768 (deep scan) | benford (diagnostic) | 3.4 ms | 3.5 ms |
 | n/a | metadata (4 KB buffer) | 0.02 ms | 0.02 ms |
 | 384x384 | provenance short-circuit | 0.02 ms | 0.02 ms |
 

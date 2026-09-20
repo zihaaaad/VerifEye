@@ -30,9 +30,9 @@ one is measured and displayed but deliberately excluded from the verdict.
 | Signal | What it reads | Weight |
 | --- | --- | --- |
 | **Metadata** | PNG `tEXt`/`iTXt` chunks, JPEG APP segments, XMP, EXIF, C2PA manifests. Finds A1111 parameters, ComfyUI graphs, Midjourney flags, and camera bodies. | Decisive |
-| **2D FFT** | Radix-2 Fourier transform over Hann-windowed luminance tiles. Hunts the periodic harmonics that transposed convolutions and PixelShuffle upsampling leave behind, and fits the radial power-law slope against the 1/f² natural-image law. | 1.00 |
+| **2D FFT** | Radix-2 Fourier transform over Hann-windowed luminance tiles, hunting the periodic harmonics that transposed convolutions and PixelShuffle upsampling leave behind. Scoring rests on the harmonic peak count, which compares each bin against its own neighbourhood rather than a fixed cutoff. Radial slope and HF/MF ratio are measured and reported but **not scored** — see below. | 1.00 |
 | **CFA lattice** | Bayer demosaicing traces. A single-sensor camera measures green on one diagonal parity and *interpolates* the other, so a bilinear residual nearly vanishes on half the pixels. Neural decoders emit every channel at every pixel and leave both parities identical. | 1.10 |
-| **Noise residual** | Laplacian high-pass residual, kurtosis against the Gaussian 3.0, and patch-wise detection of the oversmoothing diffusion models produce on skin and sky. | 0.90 |
+| **Noise residual** | Laplacian high-pass residual, with kurtosis measured over **flat regions only** so the Gaussian 3.0 reference actually applies, plus patch-wise detection of the oversmoothing diffusion models produce on skin and sky. | 0.90 |
 | **Error Level Analysis** | Re-encodes at a known quality and differences the result. Regions carrying a different compression history — a splice, an inpainted patch, a regenerated face — stand out as error-level outliers. | 0.60 |
 | **Color & optics** | Inter-channel Pearson correlation, saturation entropy, and radial chromatic dispersion at peripheral high-contrast edges, which physical glass produces and a decoder does not. | 0.50 |
 | **Encoder fingerprint** | Parses JPEG DQT tables and matches them against the IJG Annex K reference at every quality. Cameras and Adobe ship custom tables; Pillow and libjpeg ship the standard one scaled. | 0.40 |
@@ -44,6 +44,28 @@ A demosaicing lattice proves an optical sensor. Its *absence* proves nothing: an
 resize, crop to an odd offset, or re-encode erases it too. So CFA may push a verdict
 toward "real" and is structurally forbidden from pushing it toward "AI". The fusion
 layer clamps it, and a test asserts the clamp holds.
+
+### Two FFT rules were removed for failing their own test
+
+The frequency analyzer originally scored on three rules. Two of them were measured
+against 1/f references and a nearest-neighbour-upsampled control, and both failed:
+
+- The **radial slope** rule flagged anything above −1.1 as "unnatural flat decay". It
+  fired on natural surfaces *and* on the synthetic control, separating nothing. It was
+  also fitted on `log(log(|F|))` — the magnitude array was already log-compressed — so
+  every image measured around −0.1 regardless of content. The log bug is fixed; the
+  threshold is gone.
+- The **HF/MF energy ratio** rule flagged anything above 1.4. Every reference measured
+  2.4–3.0, so it fired on 100% of images, and it read *lower* on the synthetic control
+  than on natural content — pointing the wrong way where it discriminated at all.
+
+Together they added +45 to the most heavily weighted signal in the engine for
+essentially every image. Both are now reported as diagnostics for calibration to fit.
+
+Separately, kurtosis was being measured over the whole frame, where the Laplacian is
+dominated by scene edges rather than sensor noise: a real photograph measured **96**
+against a "synthetic above 8.0" threshold. Measured over flat regions, the same image
+reads **3.27** — the value theory predicts for sensor noise.
 
 ### Why one signal doesn't vote
 
@@ -129,9 +151,9 @@ Measured, not asserted. Run `npm run bench`; results land in
 
 | Input | Full ensemble (median) |
 | --- | --- |
-| 256×256 | ~6 ms |
-| 384×384 *(hover default)* | ~8 ms |
-| 768×768 *(deep scan)* | ~20 ms |
+| 256×256 | ~7 ms |
+| 384×384 *(hover default)* | ~9 ms |
+| 768×768 *(deep scan)* | ~21 ms |
 
 **Scope:** engine time only — decoded RGBA in, fused verdict out. It excludes network
 fetch, image decode and browser scheduling, which usually dominate what you actually

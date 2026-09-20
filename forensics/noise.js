@@ -52,17 +52,52 @@ export function analyzeNoise(imageData) {
     const mean = residualSum / count;
     const variance = (residualSumSq / count) - (mean * mean);
 
-    // Calculate Kurtosis (Gaussian noise = 3.0; Diffusion / Generative images diverge strongly)
+    // Kurtosis of the residual, measured over FLAT REGIONS ONLY.
+    //
+    // The Gaussian reference value of 3.0 holds for sensor noise. It does not hold for
+    // the Laplacian of a whole photograph, which is dominated by edges and is therefore
+    // strongly heavy-tailed: a real Sony frame measured 96 here, far past the > 8.0
+    // "synthetic" threshold, because the image had sharp specular highlights. Measuring
+    // over the whole frame was really measuring how much edge structure the scene had.
+    //
+    // Restricting to low-gradient patches isolates the part of the residual that is
+    // actually sensor noise, which is the quantity the 3.0 reference describes.
+    const flatThreshold = estimateFlatThreshold(residual, width, height);
+
     let sumFourth = 0;
+    let flatSum = 0;
+    let flatSumSq = 0;
+    let flatCount = 0;
+
     for (let y = 1; y < height - 1; y++) {
         const row = y * width;
         for (let x = 1; x < width - 1; x++) {
-            const diff = residual[row + x] - mean;
-            sumFourth += diff * diff * diff * diff;
+            const v = residual[row + x];
+            if (Math.abs(v) > flatThreshold) continue;   // edge pixel, not noise
+            flatSum += v;
+            flatSumSq += v * v;
+            flatCount++;
         }
     }
-    const denom = count * variance * variance;
-    const kurtosis = denom > 1e-6 ? (sumFourth / denom) : 0;
+
+    let kurtosis = 3.0;
+    if (flatCount > 256) {
+        const flatMean = flatSum / flatCount;
+        const flatVariance = (flatSumSq / flatCount) - flatMean * flatMean;
+
+        if (flatVariance > 1e-6) {
+            for (let y = 1; y < height - 1; y++) {
+                const row = y * width;
+                for (let x = 1; x < width - 1; x++) {
+                    const v = residual[row + x];
+                    if (Math.abs(v) > flatThreshold) continue;
+                    const diff = v - flatMean;
+                    sumFourth += diff * diff * diff * diff;
+                }
+            }
+            kurtosis = sumFourth / (flatCount * flatVariance * flatVariance);
+        }
+    }
 
     // Patch-based local noise variance analysis (detects localized synthetic smoothing in skin/sky)
     const patchSize = 16;
@@ -146,4 +181,32 @@ export function analyzeNoise(imageData) {
         variance: Number(variance.toFixed(2)),
         details: details
     };
+}
+
+/**
+ * Robust scale estimate for the residual, used to separate flat regions from edges.
+ *
+ * Uses a median-absolute-deviation style cut rather than a standard deviation, because
+ * the edges we are trying to exclude would otherwise inflate the very threshold meant
+ * to exclude them. Sampled on a stride: this only needs to be approximately right.
+ */
+function estimateFlatThreshold(residual, width, height) {
+    const samples = [];
+    const stride = Math.max(1, Math.floor(Math.sqrt((width * height) / 4096)));
+
+    for (let y = 1; y < height - 1; y += stride) {
+        const row = y * width;
+        for (let x = 1; x < width - 1; x += stride) {
+            samples.push(Math.abs(residual[row + x]));
+        }
+    }
+
+    if (samples.length < 32) return Infinity;
+
+    samples.sort((a, b) => a - b);
+    const median = samples[samples.length >> 1];
+
+    // Keep roughly the calmest two thirds of the frame; 3x the median absolute
+    // residual is comfortably above the noise floor and below real edge energy.
+    return Math.max(1.5, median * 3);
 }
