@@ -114,10 +114,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         optCloud.classList.toggle('selected', mode === 'cloud');
     }
 
-    function showStatus(text, color = '#22c55e') {
+    let statusTimer = null;
+    function showStatus(text, color = 'var(--green)') {
         statusMsg.textContent = text;
         statusMsg.style.color = color;
-        setTimeout(() => { statusMsg.textContent = ''; }, 3500);
+        // Rapid consecutive saves would otherwise queue overlapping clears, so the
+        // message could vanish while a later one was still current.
+        clearTimeout(statusTimer);
+        statusTimer = setTimeout(() => { statusMsg.textContent = ''; }, 2200);
     }
 
     function loadStats() {
@@ -131,8 +135,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Save Engine Mode & Sensitivity
-    saveEngineBtn.addEventListener('click', async () => {
+    // --- Autosave -------------------------------------------------------------
+    //
+    // A toggle that needs a Save button afterwards is a toggle that lies: it shows the
+    // new state while the extension is still running the old one. Preferences here are
+    // single values with no validation step, so they commit on change and report it.
+    //
+    // The API key is deliberately NOT autosaved; see its handler below.
+
+    async function persistEngine() {
         let selectedMode = 'local';
         for (const radio of radioModes) {
             if (radio.checked) selectedMode = radio.value;
@@ -143,11 +154,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             sensitivity: sensitivitySelect.value
         });
 
-        showStatus('Engine settings saved successfully!');
-    });
+        showStatus('Saved');
+    }
 
-    // Save Signals
-    saveSignalsBtn.addEventListener('click', async () => {
+    async function persistSignals() {
         const sigObj = {
             metadata: sigMetadata.checked,
             fft: sigFft.checked,
@@ -161,8 +171,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
 
         await chrome.storage.sync.set({ signals: sigObj });
-        showStatus('Forensic signals updated!');
-    });
+        showStatus('Saved');
+    }
+
+    for (const radio of radioModes) {
+        radio.addEventListener('change', persistEngine);
+    }
+    sensitivitySelect.addEventListener('change', persistEngine);
+
+    for (const box of [sigMetadata, sigFft, sigNoise, sigEla, sigColor, sigCfa, sigJpegQuant]) {
+        if (box) box.addEventListener('change', persistSignals);
+    }
+
+    // The explicit buttons are gone from the markup; keep the wiring conditional so an
+    // older cached page still works rather than throwing on a null.
+    if (saveEngineBtn) saveEngineBtn.addEventListener('click', persistEngine);
+    if (saveSignalsBtn) saveSignalsBtn.addEventListener('click', persistSignals);
 
     // Save API Key
     saveApiKeyBtn.addEventListener('click', async () => {
@@ -183,16 +207,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         const geminiModel = geminiModelSelect.value;
 
         if (!apiKey) {
-            showStatus('Please enter an API key to test.', '#f59e0b');
+            showStatus('Please enter an API key to test.', 'var(--amber)');
             return;
         }
 
-        showStatus('Testing API connection...', '#38bdf8');
+        showStatus('Testing API connection...', 'var(--accent)');
         chrome.runtime.sendMessage({ action: 'testApiKey', apiKey: apiKey, model: geminiModel }, (response) => {
             if (response && response.success) {
-                showStatus('Gemini API connection verified successfully!', '#22c55e');
+                showStatus('Gemini API connection verified successfully!', 'var(--green)');
             } else {
-                showStatus(`API Test Failed: ${response?.error || 'Unknown error'}`, '#ef4444');
+                showStatus(`API Test Failed: ${response?.error || 'Unknown error'}`, 'var(--red)');
             }
         });
     });
@@ -201,7 +225,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     clearApiKeyBtn.addEventListener('click', async () => {
         apiKeyInput.value = '';
         await chrome.storage.sync.set({ apiKey: '' });
-        showStatus('API key removed. Reverted to Local Engine.', '#38bdf8');
+        showStatus('API key removed. Reverted to Local Engine.', 'var(--accent)');
     });
 
     // Excluded Domains Management
@@ -266,16 +290,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
-        dropZone.style.borderColor = '#38bdf8';
+        dropZone.style.borderColor = 'var(--accent)';
     });
 
     dropZone.addEventListener('dragleave', () => {
-        dropZone.style.borderColor = '#232f48';
+        dropZone.style.borderColor = 'var(--border-strong)';
     });
 
     dropZone.addEventListener('drop', (e) => {
         e.preventDefault();
-        dropZone.style.borderColor = '#232f48';
+        dropZone.style.borderColor = 'var(--border-strong)';
         if (e.dataTransfer.files && e.dataTransfer.files[0]) {
             handleLocalFile(e.dataTransfer.files[0]);
         }
@@ -298,10 +322,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     function runTestAnalysis(imageUrl) {
         testResultBox.style.display = 'block';
         resClassification.textContent = 'Analyzing image...';
-        resClassification.style.color = '#94a3b8';
+        resClassification.style.color = 'var(--text-faint)';
         resProbability.textContent = '...';
         resBar.style.width = '0%';
-        resBar.style.background = '#38bdf8';
+        resBar.style.background = 'var(--accent)';
         resEngine.textContent = 'Running multi-signal algorithms...';
         resReasons.innerHTML = '<li>Decomposing 2D Fourier spectrum & noise residuals...</li>';
 
@@ -316,7 +340,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         chrome.runtime.sendMessage({ action: 'analyzeImage', imageUrl: imageUrl, deepScan: true }, (response) => {
             if (chrome.runtime.lastError || !response || !response.success) {
                 resClassification.textContent = 'Analysis Failed';
-                resClassification.style.color = '#ef4444';
+                resClassification.style.color = 'var(--red)';
                 resProbability.textContent = 'Error';
                 resReasons.innerHTML = `<li>${response?.error || chrome.runtime.lastError?.message || 'Could not process image.'}</li>`;
                 return;
@@ -331,14 +355,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             resBar.style.width = `${prob}%`;
 
             if (prob >= 70) {
-                resClassification.style.color = '#ef4444';
-                resBar.style.background = '#ef4444';
+                resClassification.style.color = 'var(--red)';
+                resBar.style.background = 'var(--red)';
             } else if (prob >= 35) {
-                resClassification.style.color = '#f59e0b';
-                resBar.style.background = '#f59e0b';
+                resClassification.style.color = 'var(--amber)';
+                resBar.style.background = 'var(--amber)';
             } else {
-                resClassification.style.color = '#22c55e';
-                resBar.style.background = '#22c55e';
+                resClassification.style.color = 'var(--green)';
+                resBar.style.background = 'var(--green)';
             }
 
             // Signal Telemetry Meters
@@ -429,7 +453,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const cw = labFftCanvas.width;
         const ch = labFftCanvas.height;
 
-        labFftCtx.fillStyle = '#020305';
+        labFftCtx.fillStyle = '#0b0b0e';
         labFftCtx.fillRect(0, 0, cw, ch);
 
         const fft = result.signals && result.signals.fft;
@@ -437,7 +461,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (!spectrum || !spectrum.base64) {
             labFftCtx.font = '11px JetBrains Mono, monospace';
-            labFftCtx.fillStyle = '#64748b';
+            labFftCtx.fillStyle = 'var(--text-faint)';
             labFftCtx.fillText('Spectrum unavailable (image below 128x128)', 12, ch / 2);
             if (labSpectrumCaption) labSpectrumCaption.textContent = '';
             return;

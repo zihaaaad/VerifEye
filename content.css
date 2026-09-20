@@ -1,190 +1,313 @@
-/* VerifEye Modern Glassmorphism Styles */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/**
+ * VerifEye hover indicator.
+ *
+ * Design rule: be quiet when there is nothing to say.
+ *
+ * The previous version showed a 320px dark card over the top-left corner of every
+ * image the pointer crossed, 250ms after arriving, with a verdict, a progress bar,
+ * two reasons and a keyboard hint — the same volume whether the answer was
+ * "ordinary photograph" or "this is synthetic". Browsing a gallery meant a card
+ * covering whatever you were trying to look at, over and over.
+ *
+ * Now it has two states. A small chip sits at the image corner carrying a coloured
+ * dot and a number; that is the whole resting presence. The full panel appears only
+ * on intent — you hover the chip, you press V — or unprompted when the verdict is
+ * actually suspicious, which is the one case worth interrupting for.
+ *
+ * Nothing is injected into the page's own stylesheet cascade beyond these two ids,
+ * and every property is defensively specified because host pages set wild defaults.
+ */
 
 #verifeye-tooltip {
+    /* Host pages routinely set `* { box-sizing }`, line-height, and font-size in ways
+       that would distort an injected widget, so the essentials are restated. */
     position: fixed;
     z-index: 2147483647;
-    max-width: 320px;
-    padding: 10px 14px;
-    border-radius: 10px;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: 13px;
-    line-height: 1.4;
-    color: #ffffff;
-    pointer-events: none;
     box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0;
 
-    /* Glassmorphism Effect */
-    background: rgba(18, 24, 38, 0.92);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-    
-    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.45;
+    letter-spacing: normal;
+    text-align: left;
+    text-transform: none;
+
+    /* The container itself never intercepts the pointer; only the chip does, so the
+       page underneath stays clickable. */
+    pointer-events: none;
+
     opacity: 0;
-    transform: translateY(4px);
+    transition: opacity 0.14s ease-out;
 }
 
-#verifeye-tooltip.verifeye-visible {
-    opacity: 1;
-    transform: translateY(0);
+#verifeye-tooltip.verifeye-visible { opacity: 1; }
+
+/* ---------------------------------------------------------------- theme */
+
+#verifeye-tooltip {
+    --vf-surface: #ffffff;
+    --vf-surface-2: #f6f6f4;
+    --vf-border: rgba(0, 0, 0, 0.13);
+    --vf-shadow: 0 2px 6px rgba(0, 0, 0, 0.09), 0 8px 24px rgba(0, 0, 0, 0.11);
+    --vf-text: #1b1a17;
+    --vf-text-soft: #56544e;
+    --vf-text-faint: #86837b;
+
+    --vf-good: #1a6d4a;
+    --vf-warn: #8a5a00;
+    --vf-bad: #a8302a;
 }
 
-/* Tooltip Header */
-.verifeye-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 6px;
+@media (prefers-color-scheme: dark) {
+    #verifeye-tooltip {
+        --vf-surface: #1d1d22;
+        --vf-surface-2: #26262c;
+        --vf-border: rgba(255, 255, 255, 0.14);
+        --vf-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 8px 26px rgba(0, 0, 0, 0.5);
+        --vf-text: #e8e7e3;
+        --vf-text-soft: #a9a7a1;
+        --vf-text-faint: #7c7a74;
+
+        --vf-good: #5cc397;
+        --vf-warn: #e0b055;
+        --vf-bad: #ef8079;
+    }
 }
 
-.verifeye-badge {
+/* ---------------------------------------------------------------- chip */
+
+.verifeye-chip {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
-    font-weight: 700;
-    font-size: 13px;
-    letter-spacing: -0.01em;
+    gap: 6px;
+
+    margin: 0;
+    padding: 3px 9px 3px 7px;
+    border: 1px solid var(--vf-border);
+    border-radius: 999px;
+
+    background: var(--vf-surface);
+    box-shadow: var(--vf-shadow);
+    color: var(--vf-text);
+
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+
+    cursor: default;
+    pointer-events: auto;   /* the one element that accepts the pointer */
+
+    /* Resting state is deliberately understated. It becomes fully opaque when the
+       pointer approaches it, so it is available without demanding attention. */
+    opacity: 0.82;
+    transition: opacity 0.12s ease-out;
 }
 
+#verifeye-tooltip:hover .verifeye-chip,
+#verifeye-tooltip.is-expanded .verifeye-chip {
+    opacity: 1;
+}
+
+.verifeye-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex: none;
+    background: var(--vf-text-faint);
+}
+
+.verifeye-state-real .verifeye-dot { background: var(--vf-good); }
+.verifeye-state-uncertain .verifeye-dot { background: var(--vf-warn); }
+.verifeye-state-ai .verifeye-dot { background: var(--vf-bad); }
+
+.verifeye-state-ai .verifeye-chip { color: var(--vf-bad); }
+
+/* A busy chip pulses only while work is genuinely in flight. */
+.verifeye-state-busy .verifeye-dot {
+    animation: verifeye-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes verifeye-pulse {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .verifeye-state-busy .verifeye-dot { animation: none; opacity: 0.6; }
+    #verifeye-tooltip { transition: none; }
+}
+
+/* ---------------------------------------------------------------- panel */
+
+.verifeye-detail {
+    display: none;
+    width: 272px;
+    margin-top: 6px;
+    padding: 11px 12px 10px;
+
+    background: var(--vf-surface);
+    border: 1px solid var(--vf-border);
+    border-radius: 9px;
+    box-shadow: var(--vf-shadow);
+    color: var(--vf-text);
+
+    pointer-events: auto;
+}
+
+#verifeye-tooltip.is-expanded .verifeye-detail { display: block; }
+
+/* When the chip is anchored to the right edge the panel must grow leftward, or it
+   would push off-screen. */
+#verifeye-tooltip.align-right { text-align: right; }
+#verifeye-tooltip.align-right .verifeye-detail { text-align: left; }
+
+.verifeye-headline {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0 0 7px;
+}
+
+.verifeye-verdict {
+    font-size: 13px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    color: var(--vf-text);
+}
+
+.verifeye-state-real .verifeye-verdict { color: var(--vf-good); }
+.verifeye-state-uncertain .verifeye-verdict { color: var(--vf-warn); }
+.verifeye-state-ai .verifeye-verdict { color: var(--vf-bad); }
+
 .verifeye-engine-tag {
-    font-size: 10px;
+    font-size: 9.5px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.12);
-    color: #cbd5e1;
+    color: var(--vf-text-faint);
+    white-space: nowrap;
 }
 
-/* Progress Probability Bar */
-.verifeye-bar-container {
-    width: 100%;
-    height: 5px;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 3px;
+/* The bar shows the band, not just the point estimate: a wide range is itself the
+   finding when the signals disagree. */
+.verifeye-bar-track {
+    position: relative;
+    height: 4px;
+    margin: 0 0 7px;
+    border-radius: 2px;
+    background: var(--vf-surface-2);
     overflow: hidden;
-    margin-bottom: 6px;
 }
 
-.verifeye-bar {
+.verifeye-bar-band {
+    position: absolute;
+    top: 0;
     height: 100%;
-    border-radius: 3px;
-    transition: width 0.3s ease-out;
+    border-radius: 2px;
+    background: currentColor;
+    opacity: 0.24;
 }
 
-/* Forensic Reasons List */
+.verifeye-bar-point {
+    position: absolute;
+    top: -2px;
+    width: 2px;
+    height: 8px;
+    border-radius: 1px;
+    background: currentColor;
+}
+
+.verifeye-state-real .verifeye-bar-track { color: var(--vf-good); }
+.verifeye-state-uncertain .verifeye-bar-track { color: var(--vf-warn); }
+.verifeye-state-ai .verifeye-bar-track { color: var(--vf-bad); }
+
+.verifeye-band-text {
+    margin: 0 0 6px;
+    font-size: 10.5px;
+    color: var(--vf-text-faint);
+    font-variant-numeric: tabular-nums;
+}
+
 .verifeye-reasons {
-    margin: 4px 0 0 0;
+    margin: 0;
     padding: 0;
     list-style: none;
     font-size: 11px;
-    color: #94a3b8;
+    color: var(--vf-text-soft);
 }
 
 .verifeye-reasons li {
     position: relative;
+    margin: 0 0 3px;
     padding-left: 10px;
-    margin-top: 2px;
-    line-height: 1.35;
 }
 
 .verifeye-reasons li::before {
-    content: "•";
+    content: "";
     position: absolute;
     left: 0;
-    color: #64748b;
-}
-
-/* Spinner State */
-.verifeye-loading {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 500;
-    color: #e2e8f0;
-}
-
-.verifeye-spinner {
-    width: 14px;
-    height: 14px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-top-color: #38bdf8;
+    top: 7px;
+    width: 3px;
+    height: 3px;
     border-radius: 50%;
-    animation: verifeye-spin 0.7s linear infinite;
+    background: var(--vf-text-faint);
 }
 
-@keyframes verifeye-spin {
-    to { transform: rotate(360deg); }
-}
+.verifeye-spectrum-slot:empty { display: none; }
 
-/* Color Coding */
-/* Likely AI (High Red) */
-.verifeye-high .verifeye-badge { color: #f87171; }
-.verifeye-high .verifeye-bar { background: linear-gradient(90deg, #f59e0b, #ef4444); }
-.verifeye-high { border-color: rgba(239, 68, 68, 0.4); }
-
-/* Uncertain (Medium Yellow) */
-.verifeye-medium .verifeye-badge { color: #fbbf24; }
-.verifeye-medium .verifeye-bar { background: #f59e0b; }
-.verifeye-medium { border-color: rgba(245, 158, 11, 0.4); }
-
-/* Likely Real (Low Green) */
-.verifeye-low .verifeye-badge { color: #4ade80; }
-.verifeye-low .verifeye-bar { background: #22c55e; }
-.verifeye-low { border-color: rgba(34, 197, 94, 0.4); }
-
-/* Error State */
-.verifeye-error {
-    border-color: rgba(148, 163, 184, 0.4);
-    color: #cbd5e1;
-}
-/* --- Uncertainty band, evidence spectrum and deep-scan hint --- */
-
-#verifeye-tooltip .verifeye-band {
-    margin-top: 6px;
-    font-size: 10px;
-    letter-spacing: 0.02em;
-    color: #94a3b8;
-    font-variant-numeric: tabular-nums;
-}
-
-#verifeye-tooltip .verifeye-spectrum-slot:empty {
-    display: none;
-}
-
-#verifeye-tooltip .verifeye-spectrum-slot {
-    margin-top: 8px;
+.verifeye-spectrum-slot {
+    margin-top: 9px;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
 }
 
-#verifeye-tooltip .verifeye-spectrum {
-    width: 104px;
-    height: 104px;
+.verifeye-spectrum {
+    width: 96px;
+    height: 96px;
     border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    /* Real 64x64 measurement upscaled; smoothing would erase the harmonic spikes. */
+    border: 1px solid var(--vf-border);
+    background: #0b0b0e;
+    /* A 64x64 measurement upscaled; smoothing would erase the single-bin harmonics
+       that are the only reason to show it. */
     image-rendering: pixelated;
 }
 
-#verifeye-tooltip .verifeye-spectrum-caption {
-    font-size: 9px;
-    color: #64748b;
+.verifeye-spectrum-caption {
+    font-size: 9.5px;
+    color: var(--vf-text-faint);
     font-variant-numeric: tabular-nums;
 }
 
-#verifeye-tooltip .verifeye-hint {
-    margin-top: 7px;
-    padding-top: 6px;
-    border-top: 1px solid rgba(255, 255, 255, 0.07);
+.verifeye-hint {
+    margin-top: 8px;
+    padding-top: 7px;
+    border-top: 1px solid var(--vf-border);
     font-size: 9.5px;
     letter-spacing: 0.03em;
-    text-transform: uppercase;
-    color: #64748b;
+    color: var(--vf-text-faint);
+}
+
+.verifeye-hint kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 9.5px;
+    padding: 0 3px;
+    border: 1px solid var(--vf-border);
+    border-radius: 3px;
+    background: var(--vf-surface-2);
+}
+
+/* ---------------------------------------------------------------- error */
+
+.verifeye-notice {
+    font-size: 11px;
+    color: var(--vf-text-soft);
 }

@@ -16,6 +16,15 @@ let port = null;
 const resultCache = new Map();
 const MAX_CACHE_SIZE = 80;
 
+// 250ms fired while the pointer was still travelling across a page, so crossing a
+// gallery lit up a dozen indicators in sequence. 420ms is past the point where a
+// pause reads as intent rather than transit.
+const HOVER_DELAY_MS = 420;
+
+// Images the reader has dismissed with Escape. Keyed by URL so the indicator stays
+// gone for that image while they keep reading.
+const dismissed = new Set();
+
 function connectPort() {
     try {
         port = chrome.runtime.connect({ name: "verifeye_port" });
@@ -180,6 +189,8 @@ function handleMouseOver(event) {
     currentTargetElement = element;
     currentTargetUrl = url;
 
+    if (dismissed.has(url)) return;
+
     clearTimeout(hoverTimeout);
     hoverTimeout = setTimeout(() => {
         if (!currentTargetUrl || currentTargetUrl !== url) return;
@@ -195,12 +206,18 @@ function handleMouseOver(event) {
 
         showTooltip(element);
         sendAnalysisRequest(url);
-    }, 250);
+    }, HOVER_DELAY_MS);
 }
 
 function handleMouseOut(event) {
     // If moving to another child inside same element, don't immediately remove
     if (event.relatedTarget && currentTargetElement && currentTargetElement.contains(event.relatedTarget)) {
+        return;
+    }
+
+    // Moving onto the indicator itself must not dismiss it, or the chip could never
+    // be hovered to expand.
+    if (event.relatedTarget && currentTooltip && currentTooltip.contains(event.relatedTarget)) {
         return;
     }
 
@@ -265,11 +282,20 @@ document.addEventListener('keydown', (event) => {
         ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 
     if (typing || event.ctrlKey || event.metaKey || event.altKey) return;
-    if (event.key !== 'v' && event.key !== 'V') return;
     if (!isExtensionEnabled || !currentTargetUrl || !currentTooltip) return;
 
-    event.preventDefault();
-    requestDeepScan();
+    // Escape dismisses the indicator for this image and keeps it dismissed, so a
+    // reader who does not want it can make it go away rather than avoid the image.
+    if (event.key === 'Escape') {
+        dismissed.add(currentTargetUrl);
+        removeTooltip();
+        return;
+    }
+
+    if (event.key === 'v' || event.key === 'V') {
+        event.preventDefault();
+        requestDeepScan();
+    }
 });
 
 function showTooltip(element) {
@@ -277,69 +303,98 @@ function showTooltip(element) {
 
     const tooltip = document.createElement('div');
     tooltip.id = 'verifeye-tooltip';
+    tooltip.className = 'verifeye-state-busy';
     tooltip.innerHTML = `
-        <div class="verifeye-loading">
-            <div class="verifeye-spinner"></div>
-            <span>Analyzing image...</span>
-        </div>
+        <span class="verifeye-chip">
+            <span class="verifeye-dot"></span>
+            <span class="verifeye-chip-score">&middot;&middot;</span>
+        </span>
+        <div class="verifeye-detail"></div>
     `;
+
+    // Hovering the chip is the primary way to ask for detail. Expansion is sticky
+    // for as long as the pointer stays on the indicator or the image.
+    tooltip.addEventListener('mouseenter', () => {
+        tooltip.classList.add('is-expanded');
+        if (currentTargetElement) positionTooltip(currentTargetElement);
+    });
 
     document.body.appendChild(tooltip);
     currentTooltip = tooltip;
     positionTooltip(element);
 
-    requestAnimationFrame(() => {
-        tooltip.classList.add('verifeye-visible');
-    });
+    requestAnimationFrame(() => tooltip.classList.add('verifeye-visible'));
+}
+
+function toneFor(probability) {
+    if (probability >= 70) return 'ai';
+    if (probability >= 35) return 'uncertain';
+    return 'real';
 }
 
 function updateTooltip(result) {
     if (!currentTooltip) return;
 
     const prob = result.probability !== undefined ? result.probability : 50;
-    const classification = result.classification || (prob >= 70 ? 'Likely AI' : prob >= 35 ? 'Uncertain' : 'Likely Real');
+    const classification = result.classification ||
+        (prob >= 70 ? 'Likely AI' : prob >= 35 ? 'Uncertain' : 'Likely Real');
 
-    let colorClass = 'verifeye-low';
-    if (prob >= 70) colorClass = 'verifeye-high';
-    else if (prob >= 35) colorClass = 'verifeye-medium';
+    const tone = toneFor(prob);
 
     let engineTag = 'Local';
     if (result.engine === 'cloud_gemini' || result.engineMode === 'cloud') engineTag = 'Gemini';
     else if (result.engine === 'hybrid' || result.engineMode === 'hybrid') engineTag = 'Hybrid';
     else if (result.engine === 'local_metadata') engineTag = 'Provenance';
-    if (result.deepScan) engineTag += ' · Deep';
+    if (result.deepScan) engineTag += ' · deep';
 
-    const reasonsList = (result.reasons || []).slice(0, 2)
-        .map(r => `<li>${escapeHtml(r)}</li>`).join('');
+    // Auto-expansion is reserved for findings that justify interrupting: a verdict
+    // in AI territory, or a file that names its own generator. An ordinary
+    // photograph gets a chip and nothing more.
+    const worthInterrupting = tone === 'ai' || result.verdict === 'AI_CONFIRMED';
+    const wasExpanded = currentTooltip.classList.contains('is-expanded');
 
-    // The band is what makes the number honest: it widens when the signals disagree
-    // or when evidence was missing, both of which a bare percentage conceals.
-    let bandHtml = '';
-    if (Array.isArray(result.band) && result.verdict !== 'AI_CONFIRMED') {
-        const [low, high] = result.band;
-        if (high - low >= 2) {
-            bandHtml = `<div class="verifeye-band">range ${low}&ndash;${high}% · agreement ${Math.round((result.agreement ?? 0) * 100)}%</div>`;
-        }
+    currentTooltip.className = [
+        'verifeye-visible',
+        `verifeye-state-${tone}`,
+        (worthInterrupting || wasExpanded || result.deepScan) ? 'is-expanded' : ''
+    ].filter(Boolean).join(' ');
+
+    const chipScore = currentTooltip.querySelector('.verifeye-chip-score');
+    if (chipScore) chipScore.textContent = `${prob}%`;
+
+    const band = Array.isArray(result.band) ? result.band : [prob, prob];
+    const low = Math.max(0, Math.min(100, band[0]));
+    const high = Math.max(low, Math.min(100, band[1]));
+
+    let bandText = '';
+    if (result.verdict === 'AI_CONFIRMED') {
+        bandText = 'Generator named in the file metadata';
+    } else if (high - low >= 2) {
+        bandText = `Range ${low}\u2013${high}% · agreement ${Math.round((result.agreement ?? 0) * 100)}%`;
     }
 
-    const hintText = result.deepScan
-        ? 'Deep scan complete'
-        : 'Press V for deep scan';
+    const reasons = (result.reasons || []).slice(0, 2)
+        .map(r => `<li>${escapeHtml(r)}</li>`).join('');
 
-    currentTooltip.className = `verifeye-visible ${colorClass}`;
-    currentTooltip.innerHTML = `
-        <div class="verifeye-header">
-            <span class="verifeye-badge">${escapeHtml(classification)} <b>${prob}%</b></span>
-            <span class="verifeye-engine-tag">${escapeHtml(engineTag)}</span>
-        </div>
-        <div class="verifeye-bar-container">
-            <div class="verifeye-bar" style="width: ${prob}%;"></div>
-        </div>
-        ${bandHtml}
-        ${reasonsList ? `<ul class="verifeye-reasons">${reasonsList}</ul>` : ''}
-        <div class="verifeye-spectrum-slot"></div>
-        <div class="verifeye-hint">${escapeHtml(hintText)}</div>
-    `;
+    const detail = currentTooltip.querySelector('.verifeye-detail');
+    if (detail) {
+        detail.innerHTML = `
+            <div class="verifeye-headline">
+                <span class="verifeye-verdict">${escapeHtml(classification)}</span>
+                <span class="verifeye-engine-tag">${escapeHtml(engineTag)}</span>
+            </div>
+            <div class="verifeye-bar-track">
+                <span class="verifeye-bar-band" style="left:${low}%; width:${Math.max(1, high - low)}%"></span>
+                <span class="verifeye-bar-point" style="left:${prob}%"></span>
+            </div>
+            ${bandText ? `<p class="verifeye-band-text">${escapeHtml(bandText)}</p>` : ''}
+            ${reasons ? `<ul class="verifeye-reasons">${reasons}</ul>` : ''}
+            <div class="verifeye-spectrum-slot"></div>
+            <div class="verifeye-hint">${result.deepScan
+                ? 'Deep scan complete · <kbd>Esc</kbd> to dismiss'
+                : '<kbd>V</kbd> deep scan · <kbd>Esc</kbd> dismiss'}</div>
+        `;
+    }
 
     renderTooltipSpectrum(result);
 
@@ -347,9 +402,9 @@ function updateTooltip(result) {
 }
 
 /**
- * Paint the measured FFT magnitude into the tooltip. Deep scans only: the spectrum
- * is real data from the engine, not an illustration, so there is nothing to show
- * until the scan that computes it has run.
+ * Paint the measured FFT magnitude into the panel. Deep scans only: the spectrum is
+ * real data from the engine, so there is nothing to draw until the scan that
+ * computes it has run.
  */
 function renderTooltipSpectrum(result) {
     const slot = currentTooltip && currentTooltip.querySelector('.verifeye-spectrum-slot');
@@ -386,7 +441,6 @@ function renderTooltipSpectrum(result) {
         img.data[o + 3] = 255;
     }
     ctx.putImageData(img, 0, 0);
-
     slot.appendChild(canvas);
 
     const fft = result.signals.fft;
@@ -398,13 +452,18 @@ function renderTooltipSpectrum(result) {
 
 function updateTooltipError(errorText) {
     if (!currentTooltip) return;
-    currentTooltip.className = 'verifeye-visible verifeye-error';
-    currentTooltip.innerHTML = `
-        <div class="verifeye-header">
-            <span class="verifeye-badge">Notice</span>
-        </div>
-        <div style="font-size: 11px; color: #cbd5e1;">${escapeHtml(errorText || 'Analysis unavailable')}</div>
-    `;
+
+    currentTooltip.className = 'verifeye-visible is-expanded';
+
+    const chipScore = currentTooltip.querySelector('.verifeye-chip-score');
+    if (chipScore) chipScore.textContent = '--';
+
+    const detail = currentTooltip.querySelector('.verifeye-detail');
+    if (detail) {
+        detail.innerHTML = `<p class="verifeye-notice">${escapeHtml(errorText || 'Analysis unavailable')}</p>`;
+    }
+
+    if (currentTargetElement) positionTooltip(currentTargetElement);
 }
 
 function removeTooltip() {
@@ -415,27 +474,51 @@ function removeTooltip() {
 }
 
 /**
- * Viewport-Aware Positioning: keeps tooltip within viewport bounds
+ * Place the indicator so it never covers the thing it is describing.
+ *
+ * The old implementation anchored to `rect.top + 10, rect.left + 10`, which put a
+ * 320px card squarely over the top-left of the image — the corner most likely to
+ * hold a face or a subject. This anchors to the image's bottom-right and prefers
+ * the empty page outside the image, falling inside only when the image is large
+ * enough that there is nowhere else to go.
  */
 function positionTooltip(element) {
     if (!currentTooltip || !element) return;
 
     const rect = element.getBoundingClientRect();
-    const tooltipRect = currentTooltip.getBoundingClientRect();
+    const size = currentTooltip.getBoundingClientRect();
 
-    const padding = 10;
-    let top = rect.top + 10;
-    let left = rect.left + 10;
+    const width = size.width || 120;
+    const height = size.height || 26;
+    const gap = 8;
+    const margin = 8;
 
-    // Viewport boundary clamping
-    const maxTop = window.innerHeight - (tooltipRect.height || 80) - padding;
-    const maxLeft = window.innerWidth - (tooltipRect.width || 240) - padding;
+    const viewportW = window.innerWidth;
+    const viewportH = window.innerHeight;
 
-    top = Math.max(padding, Math.min(top, maxTop));
-    left = Math.max(padding, Math.min(left, maxLeft));
+    // Horizontal: right-align to the image, then clamp into the viewport. Flag the
+    // right alignment so the panel can grow leftward from the chip.
+    let left = rect.right - width;
+    const alignRight = left > rect.left;
+    currentTooltip.classList.toggle('align-right', alignRight);
 
-    currentTooltip.style.top = `${top}px`;
-    currentTooltip.style.left = `${left}px`;
+    left = Math.max(margin, Math.min(left, viewportW - width - margin));
+
+    // Vertical: below the image if it fits, otherwise above, otherwise tucked
+    // against the inside bottom edge.
+    let top;
+    if (rect.bottom + gap + height <= viewportH - margin) {
+        top = rect.bottom + gap;
+    } else if (rect.top - gap - height >= margin) {
+        top = rect.top - gap - height;
+    } else {
+        top = Math.max(margin, rect.bottom - height - gap);
+    }
+
+    top = Math.max(margin, Math.min(top, viewportH - height - margin));
+
+    currentTooltip.style.top = `${Math.round(top)}px`;
+    currentTooltip.style.left = `${Math.round(left)}px`;
 }
 
 function escapeHtml(str) {

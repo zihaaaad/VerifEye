@@ -62,10 +62,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     function updateStatusVisual(active) {
         if (active) {
             statusBanner.className = 'status-banner banner-active';
-            statusText.textContent = 'Hover Detection Active';
+            statusText.textContent = 'Detection active';
         } else {
             statusBanner.className = 'status-banner banner-disabled';
-            statusText.textContent = 'Detection Paused';
+            statusText.textContent = 'Detection paused';
         }
     }
 

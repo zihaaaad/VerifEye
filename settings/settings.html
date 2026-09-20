@@ -1,643 +1,690 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VerifEye Settings & Forensics Lab</title>
-    <link rel="icon" type="image/png" href="../assets/icon16.png">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
-        
-        :root {
-            --bg: #090d16;
-            --surface: #131b2e;
-            --surface-hover: #1e293b;
-            --border: #232f48;
-            --border-accent: rgba(56, 189, 248, 0.3);
-            --text: #f8fafc;
-            --text-muted: #94a3b8;
-            --accent: #38bdf8;
-            --accent-hover: #0284c7;
-            --green: #22c55e;
-            --amber: #f59e0b;
-            --red: #ef4444;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VerifEye Settings</title>
+<link rel="icon" type="image/png" href="../assets/icon16.png">
+<script>
+    // Applied before first paint so a dark-mode reader never gets a white flash.
+    try {
+        var saved = localStorage.getItem('verifeye-theme');
+        if (saved) document.documentElement.setAttribute('data-theme', saved);
+    } catch (e) { /* storage blocked; fall through to the media query */ }
+</script>
+<style>
+/**
+ * Settings, in the same visual language as the documentation site.
+ *
+ * The previous version was six equally weighted cards stacked in one column on a
+ * neon-on-black background, each with its own Save button. Everything looked equally
+ * important, so nothing did: the engine mode you change often sat at the same weight
+ * as an API key you set once and a counter you only read.
+ *
+ * This groups by how often you touch a thing, autosaves instead of asking, and moves
+ * the analysis tool out of "settings" into its own area, since inspecting an image is
+ * not configuration.
+ */
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+:root {
+    color-scheme: light;
 
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
-            padding: 30px 20px;
-            line-height: 1.5;
-            display: flex;
-            justify-content: center;
-        }
+    --bg: #fdfdfc;
+    --bg-sunken: #f6f6f4;
+    --bg-raised: #ffffff;
+    --border: #e3e2de;
+    --border-strong: #cfcdc7;
 
-        .container {
-            max-width: 960px;
-            width: 100%;
-        }
+    --text: #1b1a17;
+    --text-soft: #56544e;
+    --text-faint: #86837b;
+    /* settings.js writes one inline style using this name; keep it as an alias. */
+    --text-muted: #86837b;
 
-        header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 24px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--border);
-        }
+    --accent: #2a5db0;
+    --accent-soft: #eaf0fa;
 
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+    --green: #1a6d4a;
+    --amber: #8a5a00;
+    --red: #a8302a;
 
-        .brand h1 {
-            font-size: 22px;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-        }
+    --green-bg: #edf6f1;
+    --amber-bg: #fdf5e6;
+    --red-bg: #fbeeed;
 
-        .brand span {
-            color: var(--accent);
-        }
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --radius: 7px;
+}
 
-        .badge-version {
-            font-size: 11px;
-            font-weight: 600;
-            background: rgba(56, 189, 248, 0.15);
-            color: var(--accent);
-            padding: 3px 8px;
-            border-radius: 6px;
-            border: 1px solid rgba(56, 189, 248, 0.3);
-        }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+        --bg: #16161a; --bg-sunken: #121215; --bg-raised: #1d1d22;
+        --border: #2d2d34; --border-strong: #3d3d46;
+        --text: #e8e7e3; --text-soft: #a9a7a1; --text-faint: #7c7a74; --text-muted: #7c7a74;
+        --accent: #8ab0ec; --accent-soft: #1e2635;
+        --green: #5cc397; --amber: #e0b055; --red: #ef8079;
+        --green-bg: #16261f; --amber-bg: #2a2114; --red-bg: #2b1a19;
+    }
+}
 
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #16161a; --bg-sunken: #121215; --bg-raised: #1d1d22;
+    --border: #2d2d34; --border-strong: #3d3d46;
+    --text: #e8e7e3; --text-soft: #a9a7a1; --text-faint: #7c7a74; --text-muted: #7c7a74;
+    --accent: #8ab0ec; --accent-soft: #1e2635;
+    --green: #5cc397; --amber: #e0b055; --red: #ef8079;
+    --green-bg: #16261f; --amber-bg: #2a2114; --red-bg: #2b1a19;
+}
 
-        @media (max-width: 820px) {
-            .grid { grid-template-columns: 1fr; }
-        }
+*, *::before, *::after { box-sizing: border-box; }
 
-        .card {
-            background-color: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-        }
+html { scroll-behavior: smooth; scroll-padding-top: 5rem; }
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
 
-        .card h2 {
-            font-size: 16px;
-            font-weight: 700;
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
 
-        .card p {
-            font-size: 13px;
-            color: var(--text-muted);
-            margin-bottom: 16px;
-        }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
 
-        /* Radio Options */
-        .option-group {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-bottom: 16px;
-        }
+.sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
 
-        .option-card {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            background: rgba(9, 13, 22, 0.5);
-            cursor: pointer;
-            transition: border-color 0.2s, background-color 0.2s;
-        }
+/* ---------------------------------------------------------------- topbar */
 
-        .option-card:hover {
-            border-color: var(--accent);
-            background: rgba(56, 189, 248, 0.05);
-        }
+.topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: saturate(1.6) blur(8px);
+    border-bottom: 1px solid var(--border);
+}
 
-        .option-card.selected {
-            border-color: var(--accent);
-            background: rgba(56, 189, 248, 0.1);
-        }
+.topbar-inner {
+    max-width: 62rem; margin: 0 auto; padding: 0 2rem;
+    height: 3.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+}
 
-        .option-card input[type="radio"] {
-            margin-top: 3px;
-            accent-color: var(--accent);
-        }
+.wordmark {
+    display: inline-flex; align-items: center; gap: 0.55rem;
+    font-weight: 620; font-size: 0.98rem; letter-spacing: -0.01em;
+    color: var(--text); text-decoration: none;
+}
+.wordmark img { border-radius: 4px; }
 
-        .option-title {
-            font-weight: 600;
-            font-size: 14px;
-            color: var(--text);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
+.topbar-actions { display: flex; align-items: center; gap: 1rem; font-size: 0.85rem; }
+.topbar-actions a { color: var(--text-soft); text-decoration: none; }
+.topbar-actions a:hover { color: var(--text); text-decoration: underline; }
 
-        .option-desc {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
+/* A live region for save confirmations. It holds its space so nothing reflows. */
+#statusMsg {
+    font-size: 0.8rem;
+    min-width: 7rem;
+    text-align: right;
+    font-weight: 550;
+}
 
-        .tag-free {
-            background: rgba(34, 197, 94, 0.2);
-            color: var(--green);
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: 700;
-        }
+#themeToggle {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; padding: 0;
+    background: none; border: 1px solid var(--border); border-radius: var(--radius);
+    color: var(--text-soft); cursor: pointer;
+}
+#themeToggle:hover { color: var(--text); border-color: var(--border-strong); }
 
-        /* Form Controls */
-        label {
-            display: block;
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 6px;
-            color: var(--text);
-        }
+.icon-moon { display: none; }
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .icon-sun { display: none; }
+    :root:not([data-theme="light"]) .icon-moon { display: block; }
+}
+:root[data-theme="dark"] .icon-sun { display: none; }
+:root[data-theme="dark"] .icon-moon { display: block; }
+:root[data-theme="light"] .icon-sun { display: block; }
+:root[data-theme="light"] .icon-moon { display: none; }
 
-        input[type="text"],
-        input[type="password"],
-        select {
-            width: 100%;
-            padding: 10px 12px;
-            background-color: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            color: var(--text);
-            font-size: 13px;
-            margin-bottom: 12px;
-            outline: none;
-            transition: border-color 0.2s;
-        }
+/* ---------------------------------------------------------------- layout */
 
-        input:focus, select:focus {
-            border-color: var(--accent);
-        }
+.shell {
+    max-width: 62rem; margin: 0 auto; padding: 0 2rem;
+    display: grid; grid-template-columns: 12rem minmax(0, 1fr); gap: 3.5rem; align-items: start;
+}
 
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            padding: 9px 16px;
-            background-color: var(--accent);
-            color: #090d16;
-            border: none;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
+.sidebar {
+    position: sticky; top: 3.5rem;
+    padding: 2.5rem 0; font-size: 0.875rem;
+}
+.sidebar ul { list-style: none; margin: 0 0 1.5rem; padding: 0; }
+.sidebar a {
+    display: block; padding: 0.3rem 0.75rem; margin-left: -0.75rem;
+    color: var(--text-soft); text-decoration: none;
+    border-left: 2px solid transparent; border-radius: 0 var(--radius) var(--radius) 0;
+}
+.sidebar a:hover { color: var(--text); background: var(--bg-sunken); }
+.sidebar a.current {
+    color: var(--accent); border-left-color: var(--accent);
+    background: var(--accent-soft); font-weight: 550;
+}
 
-        .btn:hover {
-            background-color: var(--accent-hover);
-        }
+main { padding: 2.5rem 0 6rem; }
+section { margin-bottom: 3rem; scroll-margin-top: 5rem; }
 
-        .btn-outline {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text);
-        }
+h1 { margin: 0 0 0.4rem; font-size: 1.9rem; font-weight: 660; letter-spacing: -0.025em; }
+h2 { margin: 0 0 0.3rem; font-size: 1.2rem; font-weight: 620; letter-spacing: -0.015em; }
+h3 { margin: 1.5rem 0 0.5rem; font-size: 0.95rem; font-weight: 620; }
 
-        .btn-outline:hover {
-            background: var(--surface-hover);
-            border-color: var(--text-muted);
-        }
+.page-lede { margin: 0 0 2.5rem; color: var(--text-soft); font-size: 1.02rem; }
+.section-note { margin: 0 0 1.1rem; color: var(--text-faint); font-size: 0.87rem; }
 
-        .btn-danger {
-            background: transparent;
-            border: 1px solid rgba(239, 68, 68, 0.4);
-            color: var(--red);
-        }
+.panel {
+    background: var(--bg-raised);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 1.1rem 1.25rem;
+}
 
-        .btn-danger:hover {
-            background: rgba(239, 68, 68, 0.15);
-        }
+/* ---------------------------------------------------------------- controls */
 
-        /* Signal Checkboxes */
-        .checkbox-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-bottom: 16px;
-        }
+/* Radio cards for engine mode: the choice carries real privacy consequences, so each
+   option states them rather than hiding them behind a tooltip. */
+.choice-list { display: flex; flex-direction: column; gap: 0.5rem; margin: 0; }
 
-        .checkbox-item {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            cursor: pointer;
-        }
+.choice {
+    display: flex; gap: 0.7rem; align-items: flex-start;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    cursor: pointer; background: var(--bg-raised);
+}
+.choice:hover { border-color: var(--border-strong); }
+.choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.choice input { margin: 0.35rem 0 0; accent-color: var(--accent); flex: none; }
+.choice-body { min-width: 0; }
+.choice-title { font-weight: 600; font-size: 0.92rem; display: block; }
+.choice-desc { display: block; font-size: 0.82rem; color: var(--text-soft); }
 
-        .checkbox-item input {
-            accent-color: var(--accent);
-        }
+.field { display: block; margin-top: 1.1rem; }
+.field-label { display: block; font-weight: 600; font-size: 0.88rem; margin-bottom: 0.25rem; }
+.field-hint { display: block; font-size: 0.81rem; color: var(--text-faint); margin-bottom: 0.4rem; }
 
-        /* Telemetry Stats Dashboard */
-        .stats-dashboard {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 8px;
-            margin-bottom: 14px;
-        }
+select, input[type="text"], input[type="password"], input[type="url"] {
+    width: 100%; padding: 0.5rem 0.65rem;
+    font: inherit; font-size: 0.9rem;
+    color: var(--text); background: var(--bg);
+    border: 1px solid var(--border-strong); border-radius: var(--radius);
+}
+select { cursor: pointer; }
 
-        .stat-box {
-            background: rgba(9, 13, 22, 0.6);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 10px;
-            text-align: center;
-        }
+/* Signal toggles: a two-column checklist reads faster than eight stacked rows. */
+.signal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.15rem 1.5rem; }
 
-        .stat-box-val {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 18px;
-            font-weight: 700;
-            color: #ffffff;
-        }
+.check {
+    display: flex; gap: 0.6rem; align-items: flex-start;
+    padding: 0.5rem 0; cursor: pointer;
+}
+.check input { margin: 0.3rem 0 0; accent-color: var(--accent); flex: none; }
+.check-body { min-width: 0; }
+.check-title { display: block; font-size: 0.89rem; font-weight: 550; }
+.check-desc { display: block; font-size: 0.79rem; color: var(--text-faint); }
+.check.is-diagnostic { opacity: 0.65; }
 
-        .stat-box-label {
-            font-size: 10px;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            margin-top: 2px;
-        }
+.btn {
+    font: inherit; font-size: 0.86rem; font-weight: 550;
+    padding: 0.45rem 0.9rem;
+    border-radius: var(--radius); cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: var(--bg-raised); color: var(--text);
+}
+.btn:hover { border-color: var(--text-faint); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .btn-primary,
+:root:not([data-theme="light"]) .btn-primary { color: #10131a; }
+.btn-primary:hover { filter: brightness(1.06); }
+.btn-danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, transparent); }
+.btn-row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 1rem; }
 
-        /* Domain Tags */
-        .domain-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-bottom: 12px;
-            min-height: 32px;
-        }
+.inline-form { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+.inline-form input { flex: 1; }
 
-        .domain-tag {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 8px;
-            background: rgba(9, 13, 22, 0.8);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            font-size: 12px;
-            font-family: 'JetBrains Mono', monospace;
-        }
+/* ---------------------------------------------------------------- domains */
 
-        .domain-remove {
-            cursor: pointer;
-            color: var(--red);
-            font-weight: 700;
-        }
+#domainList { display: flex; flex-wrap: wrap; gap: 0.4rem; min-height: 1.6rem; }
 
-        /* Live Tester */
-        .test-box {
-            border: 2px dashed var(--border);
-            border-radius: 8px;
-            padding: 18px;
-            text-align: center;
-            background: rgba(9, 13, 22, 0.4);
-            cursor: pointer;
-            margin-bottom: 12px;
-            transition: border-color 0.2s;
-        }
+.domain-tag {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.2rem 0.3rem 0.2rem 0.6rem;
+    font-size: 0.82rem; font-family: var(--mono);
+    background: var(--bg-sunken); border: 1px solid var(--border); border-radius: 999px;
+}
+.domain-remove {
+    cursor: pointer; color: var(--text-faint);
+    padding: 0 0.3rem; border-radius: 50%; font-size: 0.95rem; line-height: 1.2;
+}
+.domain-remove:hover { color: var(--red); background: var(--red-bg); }
 
-        .test-box:hover {
-            border-color: var(--accent);
-        }
+/* ---------------------------------------------------------------- activity */
 
-        #testResultBox {
-            display: none;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 14px;
-            margin-top: 12px;
-        }
+.stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; }
+.stat {
+    padding: 0.8rem 0.9rem;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--bg-sunken);
+}
+.stat-num { display: block; font-size: 1.5rem; font-weight: 640; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.stat-label { display: block; font-size: 0.76rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-ai .stat-num { color: var(--red); }
+.stat-real .stat-num { color: var(--green); }
 
-        .gauge-container {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 8px;
-        }
+/* ---------------------------------------------------------------- lab */
 
-        .gauge-score {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 22px;
-            font-weight: 800;
-        }
+.drop-zone {
+    margin-top: 0.75rem; padding: 1.5rem 1rem;
+    border: 2px dashed var(--border-strong); border-radius: var(--radius);
+    text-align: center; cursor: pointer; color: var(--text-soft); font-size: 0.88rem;
+}
+.drop-zone:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 
-        .gauge-bar {
-            width: 100%;
-            height: 6px;
-            background: var(--border);
-            border-radius: 3px;
-            overflow: hidden;
-            margin-bottom: 12px;
-        }
+#testResultBox { margin-top: 1.25rem; }
 
-        .gauge-fill {
-            height: 100%;
-            transition: width 0.4s ease;
-        }
+.result-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+#resClassification { font-weight: 650; font-size: 1.05rem; }
+.gauge-score { font-size: 1.6rem; font-weight: 640; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 
-        /* Signal Telemetry Meter Grid */
-        .signals-meter-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 12px;
-            font-size: 11px;
-        }
+.gauge-bar { height: 5px; background: var(--bg-sunken); border-radius: 3px; overflow: hidden; margin: 0.5rem 0 0.35rem; }
+.gauge-fill { height: 100%; width: 0; border-radius: 3px; background: var(--accent); transition: width 0.35s ease; }
 
-        .meter-item {
-            background: rgba(19, 27, 46, 0.7);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 8px;
-        }
+#resBand { font-size: 0.8rem; color: var(--text-faint); font-variant-numeric: tabular-nums; margin-bottom: 0.9rem; }
 
-        .meter-title {
-            color: var(--text-muted);
-            font-weight: 600;
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 4px;
-        }
+.meter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0 1.5rem; margin-bottom: 1rem; }
+.meter-title {
+    display: flex; justify-content: space-between; gap: 1rem;
+    padding: 0.4rem 0; border-bottom: 1px solid var(--border); font-size: 0.83rem;
+}
+.meter-val { font-family: var(--mono); font-size: 0.78rem; color: var(--text-soft); }
 
-        .meter-val {
-            font-family: 'JetBrains Mono', monospace;
-            font-weight: 700;
-        }
+#resEngine { font-size: 0.8rem; color: var(--accent); margin-bottom: 0.5rem; }
+#resReasons { margin: 0 0 1rem; padding-left: 1.1rem; font-size: 0.86rem; color: var(--text-soft); }
+#resReasons li { margin-bottom: 0.25rem; }
 
-        #spectrumContainer {
-            margin-top: 10px;
-            border-top: 1px solid var(--border);
-            padding-top: 10px;
-        }
+#spectrumContainer { margin-top: 1rem; }
+.spectrum-label { font-size: 0.72rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); margin-bottom: 0.5rem; }
+#labFftCanvas {
+    display: block; width: 100%; max-width: 232px; height: auto;
+    border-radius: 5px; background: #0b0b0e;
+    /* Upscaled 64x64 measurement; smoothing would erase single-bin harmonics. */
+    image-rendering: pixelated;
+}
+#labSpectrumCaption { font-size: 0.75rem; color: var(--text-faint); margin-top: 0.4rem; font-variant-numeric: tabular-nums; font-family: var(--mono); }
 
-        #statusMsg {
-            font-size: 13px;
-            font-weight: 600;
-        }
-    </style>
+.callout {
+    margin-top: 1rem; padding: 0.8rem 1rem;
+    background: var(--bg-sunken); border: 1px solid var(--border);
+    border-left: 3px solid var(--border-strong);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    font-size: 0.86rem; color: var(--text-soft);
+}
+.callout strong { color: var(--text); }
+.callout-warn { background: var(--amber-bg); border-color: color-mix(in srgb, var(--amber) 25%, transparent); border-left-color: var(--amber); }
+
+/* ---------------------------------------------------------------- responsive */
+
+@media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; gap: 0; padding: 0 1.25rem; }
+    .topbar-inner { padding: 0 1.25rem; }
+    .sidebar {
+        position: static; padding: 1.25rem 0 0.25rem;
+        border-bottom: 1px solid var(--border);
+        display: flex; flex-wrap: wrap; gap: 0 1rem;
+    }
+    .sidebar ul { display: flex; flex-wrap: wrap; gap: 0 1rem; margin-bottom: 0.5rem; }
+    .sidebar a { border-left: 0; margin-left: 0; padding-left: 0; }
+    .sidebar a.current { background: none; padding-left: 0; }
+    main { padding-top: 1.75rem; }
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 560px) {
+    .topbar-actions { gap: 0.6rem; }
+    #statusMsg { display: none; }
+}
+</style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="brand">
-                <img src="../assets/icon48.png" width="32" height="32" alt="VerifEye Logo">
-                <h1>Verif<span>Eye</span></h1>
-                <span class="badge-version">v2.0 Open Source</span>
-            </div>
-            <div id="statusMsg"></div>
-        </header>
 
-        <div class="grid">
-            <!-- Left Column: Detection Engine & Telemetry -->
-            <div>
-                <!-- Detection Engine Settings -->
-                <div class="card">
-                    <h2>Detection Engine</h2>
-                    <p>Choose whether to run completely offline with open-source algorithms, or connect a cloud model.</p>
-
-                    <div class="option-group">
-                        <label class="option-card selected" id="optLocal">
-                            <input type="radio" name="engineMode" value="local" checked>
-                            <div>
-                                <div class="option-title">Local Offline Engine <span class="tag-free">100% Free &amp; Private</span></div>
-                                <div class="option-desc">Uses 2D FFT, Noise Residual, ELA, and Metadata forensics locally in your browser. Zero API key needed.</div>
-                            </div>
-                        </label>
-
-                        <label class="option-card" id="optHybrid">
-                            <input type="radio" name="engineMode" value="hybrid">
-                            <div>
-                                <div class="option-title">Hybrid Engine</div>
-                                <div class="option-desc">Instant local algorithmic scan combined with Google Gemini cloud vision verification.</div>
-                            </div>
-                        </label>
-
-                        <label class="option-card" id="optCloud">
-                            <input type="radio" name="engineMode" value="cloud">
-                            <div>
-                                <div class="option-title">Cloud API Only</div>
-                                <div class="option-desc">Direct multimodal analysis using your personal Gemini API key.</div>
-                            </div>
-                        </label>
-                    </div>
-
-                    <label for="sensitivity">Sensitivity Profile:</label>
-                    <select id="sensitivity">
-                        <option value="balanced" selected>Balanced (Recommended)</option>
-                        <option value="strict">Strict (Higher AI detection rate)</option>
-                        <option value="relaxed">Relaxed (Conservative / Low false positives)</option>
-                    </select>
-
-                    <button id="saveEngineBtn" class="btn">Save Engine Settings</button>
-                </div>
-
-                <!-- Forensic Signals -->
-                <div class="card">
-                    <h2>Active Forensic Signals</h2>
-                    <p>Toggle individual open-source forensic detectors:</p>
-                    <div class="checkbox-list">
-                        <label class="checkbox-item">
-                            <input type="checkbox" id="sigMetadata" checked>
-                            <span><b>Metadata &amp; Provenance:</b> PNG/EXIF/C2PA header scan</span>
-                        </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" id="sigFft" checked>
-                            <span><b>2D FFT Frequency:</b> Generative grid &amp; upsampling peaks</span>
-                        </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" id="sigNoise" checked>
-                            <span><b>Noise Residual:</b> Laplacian variance &amp; synthetic smoothing</span>
-                        </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" id="sigEla" checked>
-                            <span><b>Error Level (ELA):</b> Compression &amp; block consistency</span>
-                        </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" id="sigColor" checked>
-                            <span><b>Color &amp; Optics:</b> Radial lens chromatic dispersion</span>
-                        </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" id="sigCfa" checked>
-                            <span><b>CFA Lattice:</b> Bayer demosaicing trace (argues for camera only)</span>
-                        </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" id="sigJpegQuant" checked>
-                            <span><b>Encoder Fingerprint:</b> JPEG quantization table vs IJG Annex K</span>
-                        </label>
-                    </div>
-                    <button id="saveSignalsBtn" class="btn btn-outline">Save Signals</button>
-                </div>
-
-                <!-- Domain Exclusions -->
-                <div class="card">
-                    <h2>Excluded Domains</h2>
-                    <p>Disable hover detection on specific websites:</p>
-                    
-                    <div class="domain-list" id="domainList">
-                        <!-- Populated by JS -->
-                    </div>
-
-                    <div style="display: flex; gap: 8px;">
-                        <input type="text" id="newDomainInput" placeholder="e.g. github.com" style="margin-bottom: 0;">
-                        <button id="addDomainBtn" class="btn btn-outline">Add</button>
-                    </div>
-                </div>
-
-                <!-- Telemetry Dashboard -->
-                <div class="card">
-                    <h2>Lifetime Telemetry Stats</h2>
-                    <p>Images scanned and classified during this browser profile session:</p>
-                    
-                    <div class="stats-dashboard">
-                        <div class="stat-box">
-                            <div class="stat-box-val" id="statTotal">0</div>
-                            <div class="stat-box-label">Scanned</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-box-val" id="statAi" style="color: var(--red);">0</div>
-                            <div class="stat-box-label">AI Flagged</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-box-val" id="statReal" style="color: var(--green);">0</div>
-                            <div class="stat-box-label">Authentic</div>
-                        </div>
-                        <div class="stat-box">
-                            <div class="stat-box-val" id="statUncertain" style="color: var(--amber);">0</div>
-                            <div class="stat-box-label">Uncertain</div>
-                        </div>
-                    </div>
-
-                    <button id="resetStatsBtn" class="btn btn-danger" style="font-size: 11px; padding: 6px 12px;">Reset Statistics</button>
-                </div>
-            </div>
-
-            <!-- Right Column: API Settings & Live Forensics Lab -->
-            <div>
-                <!-- Cloud API Key -->
-                <div class="card">
-                    <h2>Optional Cloud API (Gemini)</h2>
-                    <p>Only needed if you selected <b>Hybrid</b> or <b>Cloud</b> mode.</p>
-
-                    <label for="apiKey">Google Gemini API Key:</label>
-                    <input type="password" id="apiKey" placeholder="AIzaSy...">
-
-                    <label for="geminiModel">Model Version:</label>
-                    <select id="geminiModel">
-                        <option value="gemini-1.5-flash" selected>Gemini 1.5 Flash (Fast &amp; Accurate)</option>
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                        <option value="gemini-flash-latest">Gemini Flash Latest</option>
-                    </select>
-
-                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                        <button id="saveApiKeyBtn" class="btn">Save API Key</button>
-                        <button id="testApiKeyBtn" class="btn btn-outline">Test Connection</button>
-                        <button id="clearApiKeyBtn" class="btn btn-outline">Clear Key</button>
-                    </div>
-                </div>
-
-                <!-- Interactive Test Lab -->
-                <div class="card">
-                    <h2>Live Forensics Test Lab</h2>
-                    <p>Test any image instantly with real-time multi-signal telemetry:</p>
-
-                    <label for="testImageUrl">Image URL:</label>
-                    <input type="text" id="testImageUrl" placeholder="https://example.com/image.jpg">
-                    
-                    <div style="margin-bottom: 12px;">
-                        <button id="testUrlBtn" class="btn" style="width: 100%;">Analyze URL</button>
-                    </div>
-
-                    <div class="test-box" id="dropZone">
-                        <div style="font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 4px;">Choose File or Drop Image</div>
-                        <div style="font-size: 12px; color: var(--text-muted);">Decodes RGBA and executes 2D FFT locally</div>
-                        <input type="file" id="fileInput" accept="image/*" style="display: none;">
-                    </div>
-
-                    <div id="testResultBox">
-                        <div class="gauge-container">
-                            <span id="resClassification" style="font-weight: 700; font-size: 15px;"></span>
-                            <span id="resProbability" class="gauge-score"></span>
-                        </div>
-                        <div class="gauge-bar">
-                            <div id="resBar" class="gauge-fill"></div>
-                        </div>
-
-                        <!-- Multi-signal Telemetry Grid -->
-                        <div class="signals-meter-grid">
-                            <div class="meter-item">
-                                <div class="meter-title"><span>2D FFT Grid</span><span id="telFft" class="meter-val">--</span></div>
-                            </div>
-                            <div class="meter-item">
-                                <div class="meter-title"><span>Noise Kurtosis</span><span id="telNoise" class="meter-val">--</span></div>
-                            </div>
-                            <div class="meter-item">
-                                <div class="meter-title"><span>Error Level (ELA)</span><span id="telEla" class="meter-val">--</span></div>
-                            </div>
-                            <div class="meter-item">
-                                <div class="meter-title"><span>Color Optics</span><span id="telColor" class="meter-val">--</span></div>
-                            </div>
-                            <div class="meter-item">
-                                <div class="meter-title"><span>CFA Lattice</span><span id="telCfa" class="meter-val">--</span></div>
-                            </div>
-                            <div class="meter-item">
-                                <div class="meter-title"><span>Encoder</span><span id="telQuant" class="meter-val">--</span></div>
-                            </div>
-                        </div>
-
-                        <div id="resBand" style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px; font-variant-numeric: tabular-nums;"></div>
-
-                        <div id="resEngine" style="font-size: 11px; color: var(--accent); margin-bottom: 8px;"></div>
-                        <ul id="resReasons" style="font-size: 12px; color: var(--text-muted); padding-left: 16px; margin-bottom: 10px;"></ul>
-
-                        <!-- FFT Spectrum Canvas -->
-                        <div id="spectrumContainer">
-                            <div style="font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;">
-                                Measured 2D Fourier Magnitude Spectrum |F(u,v)|
-                            </div>
-                            <canvas id="labFftCanvas" width="256" height="256" style="width: 100%; max-width: 256px; height: auto; border-radius: 4px; background: #020305; image-rendering: pixelated;"></canvas>
-                            <div id="labSpectrumCaption" style="font-size: 10px; color: var(--text-muted); margin-top: 6px; font-variant-numeric: tabular-nums;"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+<header class="topbar">
+    <div class="topbar-inner">
+        <a href="#" class="wordmark">
+            <img src="../assets/icon48.png" alt="" width="22" height="22">
+            <span>VerifEye</span>
+        </a>
+        <div class="topbar-actions">
+            <span id="statusMsg" role="status" aria-live="polite"></span>
+            <a href="https://zihaaaad.github.io/VerifEye/" target="_blank" rel="noopener">Docs</a>
+            <button id="themeToggle" type="button" aria-label="Switch colour theme">
+                <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+            </button>
         </div>
     </div>
+</header>
 
-    <script src="settings.js" type="module"></script>
+<div class="shell">
+    <nav class="sidebar" aria-label="Settings sections">
+        <ul>
+            <li><a href="#detection">Detection</a></li>
+            <li><a href="#signals">Signals</a></li>
+            <li><a href="#sites">Sites</a></li>
+            <li><a href="#activity">Activity</a></li>
+            <li><a href="#cloud">Cloud API</a></li>
+            <li><a href="#lab">Inspect an image</a></li>
+        </ul>
+    </nav>
+
+    <main>
+        <h1>Settings</h1>
+        <p class="page-lede">
+            Changes save as you make them. Nothing on this page leaves your device.
+        </p>
+
+        <!-- ------------------------------------------------ Detection -->
+        <section id="detection">
+            <h2>Detection</h2>
+            <p class="section-note">How images get analyzed, and how readily a verdict is called.</p>
+
+            <div class="panel">
+                <div class="choice-list" role="radiogroup" aria-label="Engine mode">
+                    <label class="choice">
+                        <input type="radio" name="engineMode" id="optLocal" value="local">
+                        <span class="choice-body">
+                            <span class="choice-title">Local</span>
+                            <span class="choice-desc">Entirely offline. No network requests of any kind. Recommended.</span>
+                        </span>
+                    </label>
+                    <label class="choice">
+                        <input type="radio" name="engineMode" id="optHybrid" value="hybrid">
+                        <span class="choice-body">
+                            <span class="choice-title">Hybrid</span>
+                            <span class="choice-desc">Local signals first; Google Gemini consulted only when they are inconclusive. Sends the image to Google.</span>
+                        </span>
+                    </label>
+                    <label class="choice">
+                        <input type="radio" name="engineMode" id="optCloud" value="cloud">
+                        <span class="choice-body">
+                            <span class="choice-title">Cloud</span>
+                            <span class="choice-desc">Gemini evaluates every image. Sends every image you hover to Google.</span>
+                        </span>
+                    </label>
+                </div>
+
+                <label class="field" for="sensitivity">
+                    <span class="field-label">Sensitivity</span>
+                    <span class="field-hint">Shifts the operating point. Strict flags more readily and produces more false positives; relaxed does the reverse.</span>
+                    <select id="sensitivity">
+                        <option value="relaxed">Relaxed — fewest false positives</option>
+                        <option value="balanced">Balanced</option>
+                        <option value="strict">Strict — flags more readily</option>
+                    </select>
+                </label>
+
+            </div>
+        </section>
+
+        <!-- ------------------------------------------------ Signals -->
+        <section id="signals">
+            <h2>Signals</h2>
+            <p class="section-note">
+                Which analyzers run. Turning one off removes its evidence from the verdict and
+                lowers the reported coverage.
+            </p>
+
+            <div class="panel">
+                <div class="signal-grid">
+                    <label class="check">
+                        <input type="checkbox" id="sigMetadata" checked>
+                        <span class="check-body">
+                            <span class="check-title">Provenance</span>
+                            <span class="check-desc">PNG chunks, EXIF, XMP, C2PA manifests</span>
+                        </span>
+                    </label>
+                    <label class="check">
+                        <input type="checkbox" id="sigFft" checked>
+                        <span class="check-body">
+                            <span class="check-title">Frequency harmonics</span>
+                            <span class="check-desc">Periodic upsampling artifacts, 2D FFT</span>
+                        </span>
+                    </label>
+                    <label class="check">
+                        <input type="checkbox" id="sigNoise" checked>
+                        <span class="check-body">
+                            <span class="check-title">Noise residual</span>
+                            <span class="check-desc">Sensor grain kurtosis and oversmoothing</span>
+                        </span>
+                    </label>
+                    <label class="check">
+                        <input type="checkbox" id="sigEla" checked>
+                        <span class="check-body">
+                            <span class="check-title">Error level</span>
+                            <span class="check-desc">Recompression difference, finds splices</span>
+                        </span>
+                    </label>
+                    <label class="check">
+                        <input type="checkbox" id="sigColor" checked>
+                        <span class="check-body">
+                            <span class="check-title">Colour &amp; optics</span>
+                            <span class="check-desc">Channel correlation, lens dispersion</span>
+                        </span>
+                    </label>
+                    <label class="check">
+                        <input type="checkbox" id="sigCfa" checked>
+                        <span class="check-body">
+                            <span class="check-title">Demosaicing lattice</span>
+                            <span class="check-desc">Bayer trace — can only argue "camera"</span>
+                        </span>
+                    </label>
+                    <label class="check">
+                        <input type="checkbox" id="sigJpegQuant" checked>
+                        <span class="check-body">
+                            <span class="check-title">Encoder fingerprint</span>
+                            <span class="check-desc">JPEG quantization table vs IJG reference</span>
+                        </span>
+                    </label>
+                    <label class="check is-diagnostic">
+                        <input type="checkbox" checked disabled>
+                        <span class="check-body">
+                            <span class="check-title">DCT first-digit law</span>
+                            <span class="check-desc">Always measured, never counted toward a verdict</span>
+                        </span>
+                    </label>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ------------------------------------------------ Sites -->
+        <section id="sites">
+            <h2>Sites</h2>
+            <p class="section-note">Domains where VerifEye stays out of the way. Subdomains are included.</p>
+
+            <div class="panel">
+                <div id="domainList"></div>
+                <div class="inline-form">
+                    <input type="text" id="newDomainInput" placeholder="example.com" autocomplete="off" spellcheck="false">
+                    <button id="addDomainBtn" class="btn">Add</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ------------------------------------------------ Activity -->
+        <section id="activity">
+            <h2>Activity</h2>
+            <p class="section-note">
+                Counters kept on this device so you can see what the extension has been doing.
+                They are never transmitted, and resetting clears them permanently.
+            </p>
+
+            <div class="panel">
+                <div class="stat-row">
+                    <div class="stat">
+                        <span class="stat-num" id="statTotal">0</span>
+                        <span class="stat-label">Scanned</span>
+                    </div>
+                    <div class="stat stat-ai">
+                        <span class="stat-num" id="statAi">0</span>
+                        <span class="stat-label">Likely AI</span>
+                    </div>
+                    <div class="stat stat-real">
+                        <span class="stat-num" id="statReal">0</span>
+                        <span class="stat-label">Likely real</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-num" id="statUncertain">0</span>
+                        <span class="stat-label">Uncertain</span>
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button id="resetStatsBtn" class="btn btn-danger">Reset counters</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ------------------------------------------------ Cloud -->
+        <section id="cloud">
+            <h2>Cloud API</h2>
+            <p class="section-note">Only used by the hybrid and cloud engine modes. Local mode ignores this entirely.</p>
+
+            <div class="panel">
+                <label class="field" for="apiKey" style="margin-top:0">
+                    <span class="field-label">Gemini API key</span>
+                    <span class="field-hint">Stored in your browser's extension storage and sent only to Google's API.</span>
+                    <input type="password" id="apiKey" placeholder="AIza…" autocomplete="off" spellcheck="false">
+                </label>
+
+                <label class="field" for="geminiModel">
+                    <span class="field-label">Model</span>
+                    <select id="geminiModel">
+                        <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                        <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                        <option value="gemini-2.0-flash">gemini-2.0-flash</option>
+                    </select>
+                </label>
+
+                <div class="btn-row">
+                    <button id="saveApiKeyBtn" class="btn btn-primary">Save key</button>
+                    <button id="testApiKeyBtn" class="btn">Test connection</button>
+                    <button id="clearApiKeyBtn" class="btn btn-danger">Remove key</button>
+                </div>
+
+                <div class="callout callout-warn">
+                    <strong>Cloud mode sends every image you hover to Google.</strong>
+                    That includes images on pages you are only passing through. Local mode is the
+                    default for this reason.
+                </div>
+            </div>
+        </section>
+
+        <!-- ------------------------------------------------ Lab -->
+        <section id="lab">
+            <h2>Inspect an image</h2>
+            <p class="section-note">
+                Run the full engine against one image and see every reading. This is a tool rather
+                than a setting — nothing here changes how the extension behaves.
+            </p>
+
+            <div class="panel">
+                <div class="inline-form" style="margin-top:0">
+                    <input type="url" id="testImageUrl" placeholder="https://example.com/image.jpg" autocomplete="off" spellcheck="false">
+                    <button id="testUrlBtn" class="btn">Analyze</button>
+                </div>
+
+                <div class="drop-zone" id="dropZone">
+                    Drop an image here, or click to choose a file
+                    <input type="file" id="fileInput" accept="image/*" hidden>
+                </div>
+
+                <div id="testResultBox" style="display:none">
+                    <div class="result-head">
+                        <span id="resClassification"></span>
+                        <span id="resProbability" class="gauge-score"></span>
+                    </div>
+                    <div class="gauge-bar"><div id="resBar" class="gauge-fill"></div></div>
+                    <div id="resBand"></div>
+
+                    <div class="meter-grid">
+                        <div class="meter-title"><span>Frequency harmonics</span><span id="telFft" class="meter-val">--</span></div>
+                        <div class="meter-title"><span>Noise residual</span><span id="telNoise" class="meter-val">--</span></div>
+                        <div class="meter-title"><span>Error level</span><span id="telEla" class="meter-val">--</span></div>
+                        <div class="meter-title"><span>Colour &amp; optics</span><span id="telColor" class="meter-val">--</span></div>
+                        <div class="meter-title"><span>Demosaicing lattice</span><span id="telCfa" class="meter-val">--</span></div>
+                        <div class="meter-title"><span>Encoder fingerprint</span><span id="telQuant" class="meter-val">--</span></div>
+                    </div>
+
+                    <div id="resEngine"></div>
+                    <ul id="resReasons"></ul>
+
+                    <div id="spectrumContainer">
+                        <div class="spectrum-label">Measured 2D Fourier magnitude |F(u,v)|</div>
+                        <canvas id="labFftCanvas" width="256" height="256"></canvas>
+                        <div id="labSpectrumCaption"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</div>
+
+<script>
+    // Theme toggle, shared behaviour with the documentation site.
+    (function () {
+        var button = document.getElementById('themeToggle');
+        if (!button) return;
+
+        button.addEventListener('click', function () {
+            var root = document.documentElement;
+            var current = root.getAttribute('data-theme');
+            if (!current) {
+                current = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            }
+            var next = current === 'dark' ? 'light' : 'dark';
+            root.setAttribute('data-theme', next);
+            try { localStorage.setItem('verifeye-theme', next); } catch (e) {}
+        });
+    })();
+
+    // Mark the section currently in view.
+    (function () {
+        var links = Array.prototype.slice.call(document.querySelectorAll('.sidebar a'));
+        var sections = links
+            .map(function (a) { return document.querySelector(a.getAttribute('href')); })
+            .filter(Boolean);
+
+        if (!sections.length || !('IntersectionObserver' in window)) return;
+
+        var observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (!entry.isIntersecting) return;
+                links.forEach(function (a) {
+                    a.classList.toggle('current', a.getAttribute('href') === '#' + entry.target.id);
+                });
+            });
+        }, { rootMargin: '-10% 0px -75% 0px' });
+
+        sections.forEach(function (s) { observer.observe(s); });
+    })();
+</script>
+
+<script src="settings.js" type="module"></script>
 </body>
 </html>

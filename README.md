@@ -174,8 +174,22 @@ cd VerifEye
 3. Click **Load unpacked** and select the project folder (`VerifEye`).
 4. Click the toolbar icon to switch detection on, then hover any image.
 
-**Press `V` while hovering** to run a deep scan: higher working resolution plus true
-recompression ELA, and a rendered FFT spectrum in the tooltip.
+### What you see while browsing
+
+The indicator is quiet by default. Hovering an image for a moment puts a small chip at
+its corner — a coloured dot and a number, nothing else. The full panel opens only when
+you ask for it, or unprompted when the verdict is actually suspicious, which is the one
+case worth interrupting for.
+
+| Action | Result |
+| --- | --- |
+| Hover an image | Chip appears at the corner after ~0.4s |
+| Hover the chip | Full panel: verdict, uncertainty band, top reasons |
+| Press `V` | Deep scan — higher resolution, true recompression ELA, measured FFT spectrum |
+| Press `Esc` | Dismiss for that image and keep it dismissed |
+
+The chip is placed below or above the image rather than over it, so it never covers the
+thing it is describing.
 
 ---
 
